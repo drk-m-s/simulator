@@ -605,6 +605,12 @@ class UPM_Profiler:
                         self.layers[layer_obj].dim_out,
                     )
                 )
+            elif self.layers[layer_obj].name == "SiLU":
+                cur_exec_time, performance, energy, transfer_bytes = (
+                    self.simulator.simulate_function(
+                        "SiLUActivation", context, output_shape, self.layers[layer_obj].dim_out
+                    )
+                )
             else:
                 cur_exec_time, performance, energy, transfer_bytes = (
                     self.simulator.simulate_layer(
