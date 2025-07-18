@@ -327,6 +327,29 @@ class WD1(Base_architecture):
             self.tflops = 64
         self.pj_per_tflop = 0.4 * 1e12
 
+class Tenstorrent(Base_architecture):
+
+    def __init__(self, *args, **kwargs):
+        self.name = "Tenstorrent"
+        super().__init__(*args, **kwargs)
+
+        # HOST communication
+        self.host_to_device_bw_GBs = 448
+        self.host_to_device_pj_per_bit = 10
+        self.device_to_host_bw_GBs = 448
+        self.device_to_host_pj_per_bit = 10
+
+        # Device memory (shared memory like)
+        self.mem_bw_GBs = 448
+        self.mem_pj_per_bit = 20
+
+        # Compute
+        self.tflops = 30
+        if self.data_type_bytes == 0.5:
+            self.tflops = 60
+        self.pj_per_tflop = 0.4 * 1e12
+
+
 class SAM_LPDDR5PIM(Base_architecture):
 
     def __init__(self, *args, **kwargs):
