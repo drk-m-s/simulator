@@ -306,6 +306,88 @@ class UPM_Tensor(torch.Tensor):
         super(UPM_Tensor, self).transpose(input, dim0, dim1)
 
 
+## For Qwen2.5-VL
+class UPM_Conv3D(torch.nn.Conv3d):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        profiler.add(self, get_context())
+
+    def forward(self, x):
+        context = get_context()
+        profiler.forward_start(x.shape)
+        x = super().forward(x)
+        profiler.forward_end(x.shape, context, layer_obj=self)
+        return x
+
+class UPM_Qwen2_5_VisionPatchEmbed(
+    transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VisionPatchEmbed
+):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        profiler.add(self, get_context())
+
+    def forward(self, x):
+        context = get_context()
+        profiler.forward_start(x.shape)
+        x = super().forward(x)
+        profiler.forward_end(x.shape, context, layer_obj=self)
+        return x
+    
+class UPM_Qwen2_5_VisionRotaryEmbedding(
+    transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VisionRotaryEmbedding
+):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        profiler.add(self, get_context())
+
+    def forward(self, seqlen):
+        context = get_context()
+        profiler.forward_start(torch.Size([seqlen]))
+        x = super().forward(seqlen)
+        profiler.forward_end(torch.Size([seqlen]), context, layer_obj=self)
+        return x
+    
+class UPM_Qwen2RMSNorm(
+    transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2RMSNorm
+):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        profiler.add(self, get_context())
+
+    def forward(self, x):
+        context = get_context()
+        profiler.forward_start(x.shape)
+        x = super().forward(x)
+        profiler.forward_end(x.shape, context, layer_obj=self)
+        return x
+
+class UPM_GELU(torch.nn.GELU):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        profiler.add(self, get_context())
+
+    def forward(self, x):
+        context = get_context()
+        profiler.forward_start(x.shape)
+        x = super().forward(x)
+        profiler.forward_end(x.shape, context, layer_obj=self)
+        return x
+    
+class UPM_Qwen2_5_VLRotaryEmbedding(
+    transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VLRotaryEmbedding
+):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        profiler.add(self, get_context())
+
+    def forward(self, x, position_ids):
+        context = get_context()
+        shape = x.shape
+        profiler.forward_start(shape)
+        x = super().forward(x, position_ids)
+        profiler.forward_end(shape, context, layer_obj=self)  # TODO: x is a tuple
+        return x
+
 __pytorch_nn_functional_softmax = torch.nn.functional.softmax
 
 # TODO: change logic here to not use stringly types
@@ -332,7 +414,7 @@ __pytorch_scaled_dot_product_attention = (
 )
 
 # TODO: here too
-def UPM_scaled_dot_product_attention(query, key, value, **kwargs):
+def UPM_scaled_dot_product_attention(query, key, value, *args, **kwargs):
     context = get_context()
     profiler.forward_func_start("scaled_dot_product_attention", context, key.shape)
     if options.sim_compute:
@@ -341,7 +423,7 @@ def UPM_scaled_dot_product_attention(query, key, value, **kwargs):
         q_shape[-1] = v_shape[-1]
         x = torch.zeros(q_shape)
     else:
-        x = __pytorch_scaled_dot_product_attention(query, key, value, **kwargs)
+        x = __pytorch_scaled_dot_product_attention(query, key, value, *args, **kwargs)
     profiler.forward_func_end("scaled_dot_product_attention", context, x.shape)
     return x
 
@@ -366,7 +448,7 @@ def profiler_init():
     profiler = UPM_Profiler(options)
 
     # torch library
-    torch.nn.Module = UPM_Module
+    # torch.nn.Module = UPM_Module #This is a problem
     torch.nn.Linear = UPM_Linear
     torch.nn.modules.linear.NonDynamicallyQuantizableLinear = (UPM_NonDynamicallyQuantizableLinear)
     torch.nn.LayerNorm = UPM_LayerNorm
@@ -379,20 +461,18 @@ def profiler_init():
     torch.matmul = UPM_Matmul
     torch.transpose = UPM_Transpose
     torch.nn.functional.scaled_dot_product_attention = UPM_scaled_dot_product_attention
-    # torch.Tensor = UPM_Tensor
-    # torch.nn.SiLU = UPM_SiLUActivation
-    # transformers.activations.SiLU = UPM_SiLUActivation
+    torch.nn.SiLU = UPM_SiLUActivation
 
-    # transformers library
+    # # transformers library
     transformers.pytorch_utils.Conv1D = UPM_Conv1D
     transformers.pytorch_utils.Conv1D = UPM_Conv1D
     transformers.activations.NewGELUActivation = UPM_NewGELUActivation
     transformers.activations.ACT2FN["gelu_new"] = (
         UPM_NewGELUActivation  # classes are hardcoded in ACT2FN
     )
-    # transformers.activations.ACT2FN["silu"] = (
-    #     UPM_SiLUActivation  # classes are hardcoded in ACT2FN
-    # )
+    transformers.activations.ACT2FN["silu"] = (
+        UPM_SiLUActivation  # classes are hardcoded in ACT2FN
+    )
     transformers.models.llama.modeling_llama.LlamaRMSNorm = UPM_LlamaRMSNorm
     transformers.models.llama.modeling_llama.LlamaRotaryEmbedding = (
         UPM_LlamaRotaryEmbedding
@@ -400,6 +480,14 @@ def profiler_init():
 
     transformers.models.mixtral.modeling_mixtral.MixtralRMSNorm = UPM_LlamaRMSNorm
     transformers.models.mistral.modeling_mistral.MistralRMSNorm = UPM_LlamaRMSNorm
+
+    # #qwen2.5-vl
+    torch.nn.Conv3d = UPM_Conv3D
+    transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VisionPatchEmbed = UPM_Qwen2_5_VisionPatchEmbed
+    transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VisionRotaryEmbedding = UPM_Qwen2_5_VisionRotaryEmbedding
+    transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2RMSNorm = UPM_Qwen2RMSNorm
+    torch.nn.GELU = UPM_GELU
+    transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VLRotaryEmbedding = UPM_Qwen2_5_VLRotaryEmbedding
 
 
 def profiler_start(

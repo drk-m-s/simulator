@@ -191,7 +191,7 @@ class Base_architecture:
         return self.data_type_bytes * (weight_size + input_size)  # + output_size)
 
     # KV cache load
-    def load_data(self, input_shape):
+    def load_data(self, input_shape: torch.Size) -> tuple[float, dict, dict]:
         batch_size = input_shape[-4] if (len(input_shape) > 3) else 1
         n_heads = input_shape[-3] if (len(input_shape) > 2) else 1
         n_rows = input_shape[-2] if (len(input_shape) > 1) else 1

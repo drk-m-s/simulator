@@ -24,8 +24,8 @@ print ("in:", options.in_tokens, "out:", options.out_tokens)
 
 your_token="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"
 
-model     = Qwen2_5_VLForConditionalGeneration.from_pretrained("Qwen/Qwen2.5-VL-3B-Instruct", token=your_token,torch_dtype="auto", device_map="auto")
-processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-3B-Instruct", token=your_token)
+model     = Qwen2_5_VLForConditionalGeneration.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct", token=your_token,torch_dtype="auto", device_map="auto")
+processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct", token=your_token)
 
 layer_mapping = {
         "LlamaRMSNorm"    : options.device,

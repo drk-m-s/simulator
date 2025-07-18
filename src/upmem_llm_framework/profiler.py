@@ -503,10 +503,10 @@ class UPM_Profiler:
             name_layer = "LlamaRotaryEmbedding"
             dim_in = 1
             dim_out = 1
-        # elif issubclass(torch.nn.SiLU, type(layer)):
-        #     name_layer = "SiLU"
-        #     dim_in = 1
-        #     dim_out = 1
+        elif issubclass(torch.nn.SiLU, type(layer)):
+            name_layer = "SiLU"
+            dim_in = 1
+            dim_out = 1
         elif issubclass(torch.nn.LayerNorm, type(layer)):
             name_layer = "LayerNorm"
             dim_in = 1
@@ -527,6 +527,30 @@ class UPM_Profiler:
             name_layer = "Conv1D"
             dim_in = layer.weight.shape[0]
             dim_out = layer.weight.shape[1]
+        elif issubclass(torch.nn.Conv3d, type(layer)):
+            name_layer = "Conv3D"
+            dim_in = layer.in_channels # Not sure if correct, but assuming in_channels is the input dimension
+            dim_out = layer.out_channels # Not sure if correct, but assuming in_channels is the input dimension
+        elif issubclass(transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VisionPatchEmbed, type(layer)):
+            name_layer = "Qwen2_5_VisionPatchEmbed"
+            dim_in = 1 # Not sure if correct
+            dim_out = 1 # Not sure if correct
+        elif issubclass(transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VisionRotaryEmbedding, type(layer)):
+            name_layer = "Qwen2_5_VisionRotaryEmbedding"
+            dim_in = 1 # Not sure if correct
+            dim_out = 1
+        elif issubclass(transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2RMSNorm, type(layer)):
+            name_layer = "Qwen2RMSNorm"
+            dim_in = 1 # Not sure if correct
+            dim_out = 1
+        elif issubclass(transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VLRotaryEmbedding, type(layer)):
+            name_layer = "Qwen2_5_VLRotaryEmbedding"
+            dim_in = 1 # Not sure if correct
+            dim_out = 1
+        elif issubclass(torch.nn.GELU, type(layer)):
+            name_layer = "GELU"
+            dim_in = 1 # Not sure if correct
+            dim_out = 1
         else:
             print("Layer:", type(layer), "not supported")
             sys.exit()

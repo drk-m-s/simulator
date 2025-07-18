@@ -12,7 +12,6 @@ from .sim_architectures import HOST
 import upmem_llm_framework.sim_architectures
 from .utils import add_dictionaries
 
-
 class Simulator:
 
     def __init__(
@@ -51,7 +50,7 @@ class Simulator:
         self.moe_end = moe_end
         self.experts_per_token = experts_per_token
 
-    def name_to_device(self, name):
+    def name_to_device(self, name) -> tuple[upmem_llm_framework.sim_architectures.Base_architecture, bool, bool]:
 
         device = name.split(",")[0].replace("-", "_")
         flags = name.split(",")[1] if len(name.split(",")) > 1 else ""
@@ -83,7 +82,7 @@ class Simulator:
 
         return new_device, do_transfer, moe
 
-    def simulate_attn(self, input_shape, weight_shape):
+    def simulate_attn(self, input_shape, weight_shape) -> tuple[float, dict, dict]:
         batch_size = input_shape[0] if (len(input_shape) > 2) else 1
         n_rows = input_shape[1] if (len(input_shape) > 1) else 1
         n_columns = input_shape[-1]
@@ -124,7 +123,7 @@ class Simulator:
         # Q x Kt
         if self.verbose:
             print("Computing Q x Kt")
-            step_time, step_perf, step_energy = self.current_device.compute_ns(
+        step_time, step_perf, step_energy = self.current_device.compute_ns(
                 input_shape, kt, load_input=False
             )
         compute_time_ns += step_time
@@ -159,7 +158,11 @@ class Simulator:
         return compute_time_ns, performance, energy_compute
 
     def simulate_end(self, input_shape, generated_tokens=1):
-
+        """
+        Simulate the end of the generation process, where the generated tokens are sent back to the host.
+        This function assumes that the input_shape is the shape of the generated tokens.
+        It returns the time taken to send the generated tokens back to the host, along with performance and energy metrics.
+        """
         time_send_ans_to_host = 0
         perf_send_ans_to_host = {}
         energy_send_ans_to_host = {}
@@ -202,6 +205,11 @@ class Simulator:
         return all_moe_seen
 
     def check_sync_point(self, context, input_shape):
+        """
+        Check if the current layer is a sync point, i.e., if it requires a transfer to a different device.
+        If so, transfer the data to the new device and return the time taken for the transfer
+        and the performance and energy metrics.
+        """
         time_send_ans_to_host = 0
         time_send_ans_from_host = 0
         perf = {}
@@ -263,7 +271,11 @@ class Simulator:
         return time_send_ans_to_host, time_send_ans_from_host, perf, energy, moved_data
 
     def simulate_layer(self, layer, input_shape, weight_shape, output_shape):
-
+        """
+        Simulate a layer of the model, including the transfer to the device, computation, and
+        transfer back to the host if necessary.
+        It returns the time taken for the transfer and computation, along with performance and energy metrics.
+        """
         time_send_ans_to_host = 0
         time_send_ans_from_host = 0
         compute_time_ns = 0
