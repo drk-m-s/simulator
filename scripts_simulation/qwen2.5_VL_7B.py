@@ -22,7 +22,7 @@ upmem_layers.profiler_init()
 parser = argparse.ArgumentParser()
 parser.add_argument("--device", default="unknown")
 parser.add_argument("--in-tokens", default=64, type=int)
-parser.add_argument("--out-tokens", default=30, type=int)
+parser.add_argument("--out-tokens", default=1000, type=int)
 parser.add_argument("--bs", default=1, type=int)
 options, _ = parser.parse_known_args()
 
