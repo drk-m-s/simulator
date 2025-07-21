@@ -620,6 +620,7 @@ class UPM_Profiler:
                     self.simulator.simulate_layer(
                         self.layers[layer_obj],
                         self.forward_input_shape,
+                        layer_obj,
                         weights_shape,
                         output_shape,
                     )
