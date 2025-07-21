@@ -12,8 +12,8 @@ upmem_layers.profiler_init()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--device", default="unknown")
-parser.add_argument("--in-tokens", default=64, type=int)
-parser.add_argument("--out-tokens", default=128, type=int)
+parser.add_argument("--in-tokens", default=1000, type=int)
+parser.add_argument("--out-tokens", default=1000, type=int)
 parser.add_argument("--bs", default=1, type=int)
 options, _ = parser.parse_known_args()
 
@@ -25,7 +25,7 @@ your_token="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"
 
 model     = transformers.AutoModelForCausalLM.from_pretrained("meta-llama/Llama-2-7b-chat-hf", token=your_token,device_map="auto", torch_dtype="auto")
 tokenizer = transformers.AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-chat-hf", token=your_token)
-print (model)
+# print (model)
 
 
 #layer_mapping = {
@@ -69,14 +69,14 @@ print (input_ids.data["input_ids"][0].shape)
 
 
 model.eval()
-print (model)
+# print (model)
 upmem_layers.profiler_start(layer_mapping, layer_attn_ctxt = layer_attn_ctxt, batch_size=options.bs)
 #start = time.time_ns()
 gen_tokens = model.generate(**input_ids,
                             do_sample=True,
                             temperature=0.9,
-							min_length=options.out_tokens,
-                            max_length=options.out_tokens+100)
+							min_new_tokens=options.out_tokens,
+                            max_new_tokens=options.out_tokens)
 #print ( (time.time_ns() - start)/1e6)
 upmem_layers.profiler_end  ()
 
