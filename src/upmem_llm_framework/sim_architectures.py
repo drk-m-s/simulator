@@ -334,13 +334,13 @@ class WD1_600(Base_architecture):
         super().__init__(*args, **kwargs)
 
         # HOST communication
-        self.host_to_device_bw_GBs = 1600
+        self.host_to_device_bw_GBs = 1100
         self.host_to_device_pj_per_bit = 2
-        self.device_to_host_bw_GBs = 1600
+        self.device_to_host_bw_GBs = 1100
         self.device_to_host_pj_per_bit = 2
 
         # Device memory (shared memory like)
-        self.mem_bw_GBs = 1600
+        self.mem_bw_GBs = 1100
         self.mem_pj_per_bit = 0.67
 
         # Compute
