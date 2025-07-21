@@ -467,19 +467,11 @@ def profiler_init():
     transformers.pytorch_utils.Conv1D = UPM_Conv1D
     transformers.pytorch_utils.Conv1D = UPM_Conv1D
     transformers.activations.NewGELUActivation = UPM_NewGELUActivation
-    transformers.activations.ACT2FN["gelu_new"] = (
-        UPM_NewGELUActivation  # classes are hardcoded in ACT2FN
-    )
-    transformers.activations.ACT2FN["silu"] = (
-        UPM_SiLUActivation  # classes are hardcoded in ACT2FN
-    )
+    transformers.activations.ACT2FN["gelu_new"] = (UPM_NewGELUActivation)  # classes are hardcoded in ACT2FN     )
+    transformers.activations.ACT2FN["silu"] = (UPM_SiLUActivation) # classes are hardcoded in ACT2FN
     transformers.models.llama.modeling_llama.LlamaRMSNorm = UPM_LlamaRMSNorm
-    transformers.models.llama.modeling_llama.LlamaRotaryEmbedding = (
-        UPM_LlamaRotaryEmbedding
-    )
-
+    transformers.models.llama.modeling_llama.LlamaRotaryEmbedding = (UPM_LlamaRotaryEmbedding)
     transformers.models.mixtral.modeling_mixtral.MixtralRMSNorm = UPM_LlamaRMSNorm
-    transformers.models.mistral.modeling_mistral.MistralRMSNorm = UPM_LlamaRMSNorm
 
     # #qwen2.5-vl
     torch.nn.Conv3d = UPM_Conv3D
