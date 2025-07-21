@@ -388,6 +388,34 @@ class UPM_Qwen2_5_VLRotaryEmbedding(
         profiler.forward_end(shape, context, layer_obj=self)  # TODO: x is a tuple
         return x
 
+## For Qwen2-VL
+
+class UPM_Qwen2VLRotaryEmbedding(transformers.models.qwen2_vl.modeling_qwen2_vl.Qwen2VLRotaryEmbedding):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        profiler.add(self, get_context())
+
+    def forward(self, x, position_ids):
+        context = get_context()
+        shape = x.shape
+        profiler.forward_start(shape)
+        x = super().forward(x, position_ids)
+        profiler.forward_end(shape, context, layer_obj=self)  # TODO: x is a tuple
+        return x
+    
+class UPM_Qwen2RMSNorm(transformers.models.qwen2_vl.modeling_qwen2_vl.Qwen2RMSNorm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        profiler.add(self, get_context())
+
+    def forward(self, x):
+        context = get_context()
+        profiler.forward_start(x.shape)
+        x = super().forward(x)
+        profiler.forward_end(x.shape, context, layer_obj=self)
+        return x
+
+
 __pytorch_nn_functional_softmax = torch.nn.functional.softmax
 
 # TODO: change logic here to not use stringly types
