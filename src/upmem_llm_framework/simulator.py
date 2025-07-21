@@ -424,6 +424,10 @@ class Simulator:
                     sum_size=self.sum_size,
                 )
             )
+        else:
+            raise ValueError(
+                f"Function {function} with type {type(function)} is not supported in the simulator."
+            )
 
         if self.verbose:
             print("Time send ans to host (ns):", time_send_ans_to_host)
