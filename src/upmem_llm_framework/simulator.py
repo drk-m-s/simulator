@@ -270,7 +270,7 @@ class Simulator:
 
         return time_send_ans_to_host, time_send_ans_from_host, perf, energy, moved_data
 
-    def simulate_layer(self, layer, input_shape, weight_shape, output_shape):
+    def simulate_layer(self, layer, input_shape, layer_obj, weight_shape, output_shape):
         """
         Simulate a layer of the model, including the transfer to the device, computation, and
         transfer back to the host if necessary.
@@ -321,8 +321,8 @@ class Simulator:
                 data_transfer = add_dictionaries(data_transfer, data_transfer_moe)
 
         # pay compute
-        step_time, step_perf, step_energy = self.current_device.compute_ns(
-            input_shape, weight_shape
+        step_time, step_perf, step_energy = self.current_device.compute_ns_by_layer(
+            input_shape, layer_obj, weight_shape
         )
         compute_time_ns += step_time
         perf_compute = add_dictionaries(perf_compute, step_perf)

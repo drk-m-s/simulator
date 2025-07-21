@@ -22,7 +22,7 @@
 import torch
 import math
 from .utils import add_dictionaries
-
+import transformers
 
 class Base_architecture:
 
@@ -175,9 +175,6 @@ class Base_architecture:
         )
 
         # Calculate how many times the kernel is applied in each dimension
-        # Based on the Conv3d output size formulas:
-        # D_out = floor((D_in + 2*padding[0] - dilation[0]*(kernel_size[0]-1) - 1) / stride[0] + 1)
-        # For simplicity, we're using the approximation from Conv2d
         depth_times = math.ceil(
             (n_depth - 1) / (stride[0] if isinstance(stride, tuple) else stride)
         )
@@ -188,11 +185,24 @@ class Base_architecture:
             (n_width - 1) / (stride[2] if isinstance(stride, tuple) else stride)
         )
 
-        # TFLOPS when applying the kernel once
-        # For Conv3d: batch_size * in_channels * kernel_depth * kernel_height * kernel_width * out_channels * 2
-        # weight_shape typically contains [out_channels, in_channels, kernel_depth, kernel_height, kernel_width]
+        # For Conv3d, weight_shape should be [out_channels, in_channels, kernel_d, kernel_h, kernel_w]
+        # But we need to handle cases where weight_shape might be shorter
+        out_channels = weight_shape[0]
+        in_channels = weight_shape[1] if len(weight_shape) > 1 else n_channels
+
+        # Get kernel dimensions from layer attributes if weight_shape is incomplete
+        kernel_size = layer.kernel_size
+        if isinstance(kernel_size, int):
+            kernel_d = kernel_h = kernel_w = kernel_size
+        else:
+            kernel_d = kernel_size[0]
+            kernel_h = kernel_size[1]
+            kernel_w = kernel_size[2]
+
+        # TFLOPS calculation for Conv3d
+        # Each output element requires kernel_d * kernel_h * kernel_w * in_channels multiply-adds
         tflops_kernel = (
-            2 * batch_size * n_channels * weight_shape[2] * weight_shape[3] * weight_shape[4] * weight_shape[0]
+            2 * batch_size * in_channels * kernel_d * kernel_h * kernel_w * out_channels
         ) / 1e12
 
         # Total TFLOPS considering all applications of the kernel
@@ -219,10 +229,14 @@ class Base_architecture:
             tflops = self.get_tflops_Conv3d(input_shape, layer, weight_shape)
         elif issubclass(torch.nn.LayerNorm, type(layer)):
             tflops = self.get_tflops_LayerNorm(input_shape)
+        elif issubclass(transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2RMSNorm, type(layer)):
+            tflops = self.get_tflops_LayerNorm(input_shape)
+        elif issubclass(torch.nn.Linear, type(layer)):
+            tflops = self.get_tflops_Linear(input_shape, weight_shape)
         else:
             # Treat everything else as Linear
             tflops = self.get_tflops_Linear(input_shape, weight_shape)
-            print ("get_tflops not defined for layer: ", type(layer))
+            #print ("get_tflops not defined for layer: ", type(layer))
             # sys.exit(-1)
         return tflops
 
@@ -366,6 +380,46 @@ class Base_architecture:
                 "pJ for compute and loading, respectively",
             )
             print("performance:", performance)
+
+        return real_time_ns, performance, energy
+
+
+    def compute_ns_by_layer(self, input_shape, layer_obj, weight_shape, load_input=False, load_weight=True):
+        
+        tflops = self.get_tflops_by_layer(input_shape, layer_obj, weight_shape)
+
+        data_size_bytes = self.get_moved_data_bytes(
+            input_shape, weight_shape, load_input=load_input, load_weight=load_weight
+        )
+
+        compute_time_ns = (tflops / self.tflops) * 1e9
+        transfer_time_ns = data_size_bytes / self.mem_bw_GBs
+        real_time_ns = max(compute_time_ns, transfer_time_ns)
+
+        performance = {
+            "compute": compute_time_ns,
+            "mem_transfer": transfer_time_ns,
+        }
+
+        energy = {
+            "compute": tflops * self.pj_per_tflop,
+            "main_mem": data_size_bytes * 8 * self.mem_pj_per_bit,
+        }
+
+        if self.verbose:
+            print(
+                f"Computing {input_shape} x {weight_shape} with TFLOPS: {tflops} "
+                f"with {data_size_bytes} bytes"
+            )
+            print(
+                f"takes {real_time_ns} ns with {compute_time_ns} in compute and {transfer_time_ns} "
+                f"in loading data"
+            )
+            print(
+                f"and consumes {energy['compute']} pJ for compute and {energy['main_mem']} pJ "
+                "for loading data"
+            )
+            print(f"performance: {performance}")
 
         return real_time_ns, performance, energy
 
