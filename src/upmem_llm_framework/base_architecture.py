@@ -153,6 +153,53 @@ class Base_architecture:
 
         return tflops
 
+    def get_tflops_Conv3d(self, input_shape, layer, weight_shape):
+        batch_size = input_shape[-5] if (len(input_shape) > 4) else 1
+        n_channels = input_shape[-4] if (len(input_shape) > 3) else 1
+        n_depth = input_shape[-3] if (len(input_shape) > 2) else 1
+        n_height = input_shape[-2] if (len(input_shape) > 1) else 1
+        n_width = input_shape[-1]
+
+        stride = layer.stride
+        padding = layer.padding
+
+        # Apply padding to all three spatial dimensions
+        n_depth = n_depth + 2 * (
+            padding[0] if isinstance(padding, tuple) else padding
+        )
+        n_height = n_height + 2 * (
+            padding[1] if isinstance(padding, tuple) else padding
+        )
+        n_width = n_width + 2 * (
+            padding[2] if isinstance(padding, tuple) else padding
+        )
+
+        # Calculate how many times the kernel is applied in each dimension
+        # Based on the Conv3d output size formulas:
+        # D_out = floor((D_in + 2*padding[0] - dilation[0]*(kernel_size[0]-1) - 1) / stride[0] + 1)
+        # For simplicity, we're using the approximation from Conv2d
+        depth_times = math.ceil(
+            (n_depth - 1) / (stride[0] if isinstance(stride, tuple) else stride)
+        )
+        height_times = math.ceil(
+            (n_height - 1) / (stride[1] if isinstance(stride, tuple) else stride)
+        )
+        width_times = math.ceil(
+            (n_width - 1) / (stride[2] if isinstance(stride, tuple) else stride)
+        )
+
+        # TFLOPS when applying the kernel once
+        # For Conv3d: batch_size * in_channels * kernel_depth * kernel_height * kernel_width * out_channels * 2
+        # weight_shape typically contains [out_channels, in_channels, kernel_depth, kernel_height, kernel_width]
+        tflops_kernel = (
+            2 * batch_size * n_channels * weight_shape[2] * weight_shape[3] * weight_shape[4] * weight_shape[0]
+        ) / 1e12
+
+        # Total TFLOPS considering all applications of the kernel
+        tflops = tflops_kernel * depth_times * height_times * width_times
+
+        return tflops
+
     def get_tflops_LayerNorm(self, input_shape):
         batch_size = input_shape[-4] if (len(input_shape) > 3) else 1
         n_heads = input_shape[-3] if (len(input_shape) > 2) else 1
@@ -168,6 +215,8 @@ class Base_architecture:
     def get_tflops_by_layer(self, input_shape, layer, weight_shape):
         if issubclass(torch.nn.Conv2d, type(layer)):
             tflops = self.get_tflops_Conv2d(input_shape, layer, weight_shape)
+        elif issubclass(torch.nn.Conv3d, type(layer)):
+            tflops = self.get_tflops_Conv3d(input_shape, layer, weight_shape)
         elif issubclass(torch.nn.LayerNorm, type(layer)):
             tflops = self.get_tflops_LayerNorm(input_shape)
         else:
