@@ -527,10 +527,14 @@ class UPM_Profiler:
             name_layer = "Conv1D"
             dim_in = layer.weight.shape[0]
             dim_out = layer.weight.shape[1]
+        elif issubclass(torch.nn.Conv2d, type(layer)):
+            name_layer = "Conv2D"
+            dim_in = layer.kernel_size[0]
+            dim_out = layer.kernel_size[1]
         elif issubclass(torch.nn.Conv3d, type(layer)):
             name_layer = "Conv3D"
-            dim_in = layer.in_channels # Not sure if correct, but assuming in_channels is the input dimension
-            dim_out = layer.out_channels # Not sure if correct, but assuming in_channels is the input dimension
+            dim_in = layer.kernel_size[0] #Not sure if correct
+            dim_out = layer.kernel_size[1] #Not sure if correct
         elif issubclass(transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VisionPatchEmbed, type(layer)):
             name_layer = "Qwen2_5_VisionPatchEmbed"
             dim_in = 1 # Not sure if correct
