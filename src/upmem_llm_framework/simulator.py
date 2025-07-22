@@ -87,11 +87,8 @@ class Simulator:
         This function models the core attention computation: Attention(Q,K,V) = softmax(QK^T)V.
         input_shape is usually a torch.Size object representing:
             3D Case: [batch_size, sequence_length, hidden_dim]
-            Example: torch.Size([2, 512, 768]) = 2 batches, 512 tokens, 768 hidden dimensions
             2D Case: [sequence_length, hidden_dim]
-            Example: torch.Size([512, 768]) = 512 tokens, 768 hidden dimensions (batch_size defaults to 1)
             1D Case: [hidden_dim]
-            Example: torch.Size([768]) = single token, 768 hidden dimensions
         '''
         batch_size = input_shape[0] if (len(input_shape) > 2) else 1
         n_rows = input_shape[1] if (len(input_shape) > 1) else 1 ## Sequence length
@@ -146,7 +143,7 @@ class Simulator:
         compute_time_ns += step_time
         performance = add_dictionaries(performance, step_perf)
         energy_compute = add_dictionaries(energy_compute, step_energy)
-        
+
         # output = V * QKt
         if self.verbose:
             print("Computing V x QKt")
