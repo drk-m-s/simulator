@@ -285,6 +285,12 @@ class Base_architecture:
         return transfer_time_ns, performance, energy
 
     def host_transfer(self, input_shape, direction="to_device", generated_tokens=1):
+        '''
+        Simulates a data transfer with host in any direction.
+        The input_shape is a torch.Size object, and the direction can be "to_device"
+        or "to_host". The generated_tokens parameter is used to calculate the total
+        number of tokens to be transferred.
+        '''
         batch_size = input_shape[-4] if (len(input_shape) > 3) else 1
         n_heads = input_shape[-3] if (len(input_shape) > 2) else 1
         n_rows = input_shape[-2] if (len(input_shape) > 1) else 1
