@@ -25,8 +25,8 @@ class Simulator:
         self.layer_mapping = {}
         self.layer_attn_ctxt = ""
         self.use_kv_cache = True
-        self.sum = True
-        self.sum_size = 0
+        self.sum = True # TRUE: Model is in summarization/prefill mode - processing the initial input prompt. False: Model is in generation/decode mode - generating new tokens one by one
+        self.sum_size = 0 # Tracks the sequence length during summarization/prefill phase. Gets updated to n_rows (current sequence length) during attention computation when self.sum = True. Used to determine KV cache size during generation phase.
         self.batch_size = 0
         self.sliding_window = sliding_window
         self.num_key_value_heads = num_key_value_heads
@@ -83,9 +83,19 @@ class Simulator:
         return new_device, do_transfer, moe
 
     def simulate_attn(self, input_shape, weight_shape) -> tuple[float, dict, dict]:
+        '''
+        This function models the core attention computation: Attention(Q,K,V) = softmax(QK^T)V.
+        input_shape is usually a torch.Size object representing:
+            3D Case: [batch_size, sequence_length, hidden_dim]
+            Example: torch.Size([2, 512, 768]) = 2 batches, 512 tokens, 768 hidden dimensions
+            2D Case: [sequence_length, hidden_dim]
+            Example: torch.Size([512, 768]) = 512 tokens, 768 hidden dimensions (batch_size defaults to 1)
+            1D Case: [hidden_dim]
+            Example: torch.Size([768]) = single token, 768 hidden dimensions
+        '''
         batch_size = input_shape[0] if (len(input_shape) > 2) else 1
-        n_rows = input_shape[1] if (len(input_shape) > 1) else 1
-        n_columns = input_shape[-1]
+        n_rows = input_shape[1] if (len(input_shape) > 1) else 1 ## Sequence length
+        n_columns = input_shape[-1] ## d_model Hidden dimension
 
         # input (n_rows, n_columns) x Wqkv (n_columns, Wqkv), where Wqkv is n_columns*3 (all Wq, Wk, Wv together)
         # Qall_heads = (n_rows, n_columns), each head computes n_columns/n_heads
@@ -102,7 +112,7 @@ class Simulator:
         v = torch.Size([n_rows, n_columns])
 
         if self.use_kv_cache:
-            if self.sum:
+            if self.sum: # Summarization/prefill mode
                 self.sum_size = n_rows  # Just to keep it updated
             else:
                 # load KV cache
@@ -124,18 +134,24 @@ class Simulator:
         if self.verbose:
             print("Computing Q x Kt")
         step_time, step_perf, step_energy = self.current_device.compute_ns(
-                input_shape, kt, load_input=False
-            )
+                input_shape, kt, load_input=False)
         compute_time_ns += step_time
         performance = add_dictionaries(performance, step_perf)
         energy_compute = add_dictionaries(energy_compute, step_energy)
-
+        
+        # Softmax(QKt)
+        if self.verbose:
+            print("Computing softmax(QKt)")
+        step_time, step_perf, step_energy = self.current_device.compute_softmax_ns(qkt)
+        compute_time_ns += step_time
+        performance = add_dictionaries(performance, step_perf)
+        energy_compute = add_dictionaries(energy_compute, step_energy)
+        
         # output = V * QKt
         if self.verbose:
             print("Computing V x QKt")
         step_time, step_perf, step_energy = self.current_device.compute_ns(
-            qkt, v, load_input=False
-        )
+            qkt, v, load_input=False)
         compute_time_ns += step_time
         performance = add_dictionaries(performance, step_perf)
         energy_compute = add_dictionaries(energy_compute, step_energy)
