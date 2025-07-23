@@ -21,8 +21,8 @@ upmem_layers.profiler_init()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--device", default="unknown")
-parser.add_argument("--in-tokens", default=64, type=int)
-parser.add_argument("--out-tokens", default=1000, type=int)
+parser.add_argument("--in-tokens", default=1000, type=int)
+parser.add_argument("--out-tokens", default=100, type=int)
 parser.add_argument("--bs", default=1, type=int)
 options, _ = parser.parse_known_args()
 
@@ -62,12 +62,44 @@ processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct",use_fast
 # max_pixels = 1280*28*28
 # processor = AutoProcessor.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct", min_pixels=min_pixels, max_pixels=max_pixels)
 
+def generate_exact_text(processor, options):
+    dummy_token = "describe"
+    # Start with a reasonable guess
+    repeat = options.in_tokens // len(processor.tokenizer(dummy_token, add_special_tokens=False)["input_ids"])
+    while True:
+        dummy_text = " ".join([dummy_token] * repeat)
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "image": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg",
+                        "resized_height": 480,
+                        "resized_width": 640,
+                    },
+                    {"type": "text", "text": dummy_text},
+                ],
+            }
+        ]
+        text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        text_only_inputs = processor(
+            text=[text],
+            images=None,
+            videos=None,
+            padding=True,
+            return_tensors="pt",
+        )
+        num_tokens = text_only_inputs.input_ids.shape[1]
+        if num_tokens < options.in_tokens:
+            repeat += 1
+        elif num_tokens > options.in_tokens:
+            repeat -= 1
+        else:
+            return dummy_text
 
-# # Download and resize the image
-# img_url = "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg"
-# response = requests.get(img_url)
-# img = Image.open(BytesIO(response.content)).convert("RGB")
-# img = img.resize((468, 364))  # width, height
+# Generate dummy text sequence
+dummy_text = generate_exact_text(processor, options)
 
 messages = [
     {
@@ -76,18 +108,32 @@ messages = [
             {
                 "type": "image",
                 "image": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg",
+                "resized_height": 480,
+                "resized_width": 640,
             },
-            {"type": "text", "text": "Describe this image like I am a 4 year old and don't know much about anything."},
+            {"type": "text", "text": dummy_text},
         ],
     }
 ]
 
 upmem_layers.profiler_start(layer_mapping, batch_size=options.bs)
 
+print(f"Simulating with device: {options.device}")
+
 # Preparation for inference
 text = processor.apply_chat_template(
     messages, tokenize=False, add_generation_prompt=True
 )
+
+# Count text-only tokens by processing text without images/videos
+text_only_inputs = processor(
+    text=[text],
+    images=None,
+    videos=None,
+    padding=True,
+    return_tensors="pt",
+)
+print("Text tokens:", text_only_inputs.input_ids.shape[1])
 
 image_inputs, video_inputs = process_vision_info(messages)
 

@@ -17,6 +17,60 @@ class HOST(Base_architecture):
         self.name = "HOST"
         super().__init__(*args, **kwargs)
 
+class WD1(Base_architecture):
+    
+    def __init__(self, *args, **kwargs):
+        self.name = "WD1"
+        super().__init__(*args, **kwargs)
+
+        # Effectiveness ratio
+        memory_bw_efficiency_ratio = 0.7
+        compute_efficiency_ratio = 0.7
+
+        # HOST communication
+        self.host_to_device_bw_GBs = memory_bw_efficiency_ratio * 1600
+        self.host_to_device_pj_per_bit = 32 # Through PCIe
+        self.device_to_host_bw_GBs = memory_bw_efficiency_ratio * 1600
+        self.device_to_host_pj_per_bit = 32 # Through PCIe
+
+        # Device memory (shared memory like)
+        self.mem_bw_GBs = memory_bw_efficiency_ratio * 1600
+        self.mem_pj_per_bit = 1.3 #1.3 from DRAM to Logic + 0.67 for DRAM 
+
+        # Compute
+        self.tflops = compute_efficiency_ratio * 32
+        if self.data_type_bytes == 0.5:
+            self.tflops = compute_efficiency_ratio * 64
+        self.pj_per_tflop = 0.8 * 1e12 
+
+class WD1_600(Base_architecture):
+    
+    def __init__(self, *args, **kwargs):
+        self.name = "WD1_600"
+        super().__init__(*args, **kwargs)
+
+        # Effectiveness ratio
+        memory_bw_efficiency_ratio = 0.7
+        compute_efficiency_ratio = 0.7
+        
+        # Frequency lower ratio as compared to 1GHz
+        frequency_lower_ratio = 0.6
+
+        # HOST communication
+        self.host_to_device_bw_GBs = frequency_lower_ratio * memory_bw_efficiency_ratio * 1600
+        self.host_to_device_pj_per_bit = 32
+        self.device_to_host_bw_GBs = frequency_lower_ratio * memory_bw_efficiency_ratio * 1600
+        self.device_to_host_pj_per_bit = 32
+
+        # Device memory (shared memory like)
+        self.mem_bw_GBs = frequency_lower_ratio * memory_bw_efficiency_ratio * 1600
+        self.mem_pj_per_bit = 1.3
+
+        # Compute
+        self.tflops = frequency_lower_ratio * compute_efficiency_ratio * 32
+        if self.data_type_bytes == 0.5:
+            self.tflops = frequency_lower_ratio * compute_efficiency_ratio * 64
+        self.pj_per_tflop = 0.8 * 1e12
 
 class DGX100(Base_architecture):
 
@@ -303,50 +357,6 @@ class Snapdragon8gen3(Base_architecture):
         self.tflops = 4.73
         if self.data_type_bytes == 0.5:
             self.tflops = 34
-        self.pj_per_tflop = 0.4 * 1e12
-
-class WD1(Base_architecture):
-    
-    def __init__(self, *args, **kwargs):
-        self.name = "WD1"
-        super().__init__(*args, **kwargs)
-
-        # HOST communication
-        self.host_to_device_bw_GBs = 1600
-        self.host_to_device_pj_per_bit = 2
-        self.device_to_host_bw_GBs = 1600
-        self.device_to_host_pj_per_bit = 2
-
-        # Device memory (shared memory like)
-        self.mem_bw_GBs = 1600
-        self.mem_pj_per_bit = 0.67
-
-        # Compute
-        self.tflops = 32
-        if self.data_type_bytes == 0.5:
-            self.tflops = 64
-        self.pj_per_tflop = 0.4 * 1e12
-
-class WD1_600(Base_architecture):
-    
-    def __init__(self, *args, **kwargs):
-        self.name = "WD1_600"
-        super().__init__(*args, **kwargs)
-
-        # HOST communication
-        self.host_to_device_bw_GBs = 1100
-        self.host_to_device_pj_per_bit = 2
-        self.device_to_host_bw_GBs = 1100
-        self.device_to_host_pj_per_bit = 2
-
-        # Device memory (shared memory like)
-        self.mem_bw_GBs = 1100
-        self.mem_pj_per_bit = 0.67
-
-        # Compute
-        self.tflops = 19
-        if self.data_type_bytes == 0.5:
-            self.tflops = 38
         self.pj_per_tflop = 0.4 * 1e12
 
 class Tenstorrent(Base_architecture):

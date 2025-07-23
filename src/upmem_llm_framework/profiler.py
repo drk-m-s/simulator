@@ -11,23 +11,8 @@ import torch
 import sys
 import transformers
 
-from .simulator import Simulator
+from .simulator import Simulator, layer_profile
 from .utils import add_dictionaries
-
-
-class layer_profile:
-    def __init__(self, uniq_id, name, n_layer, context, dim_in, dim_out, obj=None):
-        self.id = uniq_id
-        self.name = name
-        self.n_layer = n_layer
-        self.context = context
-        self.dim_in = dim_in
-        self.dim_out = dim_out
-        self.exec_time = 0
-        self.exec_nums = 0
-        self.energy = {}
-        self.obj = obj
-
 
 class layer_log:
     def __init__(
@@ -68,7 +53,7 @@ class UPM_Profiler:
 
     def set_options(self, options):
         self.options = options
-        # nimulation related
+        # simulation related
         self.simulation = options.simulation
         self.sim_compute = options.sim_compute
         self.sim_sliding_window = options.sim_sliding_window
@@ -88,7 +73,7 @@ class UPM_Profiler:
         if self.simulation:
             self.simulator = self.create_arch_simulator()
 
-    def create_arch_simulator(self):
+    def create_arch_simulator(self) -> Simulator:
         return Simulator(
             data_type_bytes=self.sim_data_type_bytes,
             sliding_window=self.sim_sliding_window,
@@ -96,7 +81,7 @@ class UPM_Profiler:
             verbose=self.options.sim_verbose,
         )
 
-    def print_layers_model(self):
+    def print_layers_model(self) -> None:
         print("##### Layers of Model in order of creation #####")
         print(
             "Layer ID (creation order), Context, Function, Dimensions (rows x columns), times executed, avg. execution time (ms)"
@@ -243,7 +228,7 @@ class UPM_Profiler:
     def print_log(self):
         print("##### Execution log #####")
         print(
-            "Start time, exec time, Function, Context, input shape, weights shape, output shape"
+            "Start time, exec time, ID, Function, Context, input shape, weights shape, output shape"
         )
         for log in self.log:
             input_shape = "(" + ",".join([str(x) for x in log.input]) + ")"
@@ -316,7 +301,7 @@ class UPM_Profiler:
         self.log = []
 
         if self.simulation:
-            self.simulator = self.create_arch_simulator()
+            self.simulator:Simulator = self.create_arch_simulator()
             self.simulator.map_layers(
                 layer_mapping,
                 layer_attn_ctxt=layer_attn_ctxt,
@@ -474,7 +459,7 @@ class UPM_Profiler:
 
         print("##### END UPMEM PROFILER OUTPUT #####")
 
-    def add(self, layer, context):
+    def add(self, layer: torch.nn.Module, context: str) -> None:
         # print ("Profiling layer...")
         name_layer = ""
         dim_in = 0
@@ -554,6 +539,18 @@ class UPM_Profiler:
         elif issubclass(torch.nn.GELU, type(layer)):
             name_layer = "GELU"
             dim_in = 1 # Not sure if correct
+            dim_out = 1
+        elif issubclass(transformers.models.glm4v.modeling_glm4v.Glm4vRMSNorm, type(layer)):
+            name_layer = "Glm4vRMSNorm"
+            dim_in = 1
+            dim_out = 1
+        elif issubclass(transformers.models.glm4v.modeling_glm4v.Glm4vVisionRotaryEmbedding, type(layer)):
+            name_layer = "Glm4vVisionRotaryEmbedding"
+            dim_in = 1
+            dim_out = 1
+        elif issubclass(transformers.models.glm4v.modeling_glm4v.Glm4vTextRotaryEmbedding, type(layer)):
+            name_layer = "Glm4vTextRotaryEmbedding"
+            dim_in = 1
             dim_out = 1
         else:
             print("Layer:", type(layer), "not supported")

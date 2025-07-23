@@ -354,12 +354,16 @@ class UPM_Qwen2RMSNorm(
         super().__init__(*args, **kwargs)
         profiler.add(self, get_context())
 
-    def forward(self, x):
+    def forward(self, hidden_states):
         context = get_context()
-        profiler.forward_start(x.shape)
-        x = super().forward(x)
-        profiler.forward_end(x.shape, context, layer_obj=self)
-        return x
+        profiler.forward_start(hidden_states.shape)
+        input_dtype = hidden_states.dtype
+        hidden_states = hidden_states.to(torch.float32)
+        variance = hidden_states.pow(2).mean(-1, keepdim=True)
+        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+        out = self.weight * hidden_states.to(input_dtype)
+        profiler.forward_end(out.shape, context, layer_obj=self)
+        return out
 
 class UPM_GELU(torch.nn.GELU):
     def __init__(self, *args, **kwargs):
@@ -415,6 +419,48 @@ class UPM_Qwen2RMSNorm(transformers.models.qwen2_vl.modeling_qwen2_vl.Qwen2RMSNo
         profiler.forward_end(x.shape, context, layer_obj=self)
         return x
 
+
+# For GLM4.1v-9B-Thinking
+class UPM_Glm4vRMSNorm(transformers.models.glm4v.modeling_glm4v.Glm4vRMSNorm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        profiler.add(self, get_context())
+    
+    def forward(self, hidden_states):
+        context = get_context()
+        profiler.forward_start(hidden_states.shape)
+        input_dtype = hidden_states.dtype
+        hidden_states = hidden_states.to(torch.float32)
+        variance = hidden_states.pow(2).mean(-1, keepdim=True)
+        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+        out = self.weight * hidden_states.to(input_dtype)
+        profiler.forward_end(out.shape, context, layer_obj=self)
+        return out
+    
+class UPM_Glm4vVisionRotaryEmbedding(transformers.models.glm4v.modeling_glm4v.Glm4vVisionRotaryEmbedding):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        profiler.add(self, get_context())
+
+    def forward(self, seqlen: int) -> torch.Tensor:
+        context = get_context()
+        profiler.forward_start(torch.Size([seqlen]))
+        x = super().forward(seqlen)
+        profiler.forward_end(torch.Size([seqlen]), context, layer_obj=self)
+        return x
+
+class UPM_Glm4vTextRotaryEmbedding(transformers.models.glm4v.modeling_glm4v.Glm4vTextRotaryEmbedding):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        profiler.add(self, get_context())
+
+    def forward(self, x, position_ids):
+        context = get_context()
+        shape = x.shape
+        profiler.forward_start(shape)
+        cos, sin = super().forward(x, position_ids)
+        profiler.forward_end(shape, context, layer_obj=self)
+        return cos, sin
 
 __pytorch_nn_functional_softmax = torch.nn.functional.softmax
 
@@ -493,7 +539,6 @@ def profiler_init():
 
     # # transformers library
     transformers.pytorch_utils.Conv1D = UPM_Conv1D
-    transformers.pytorch_utils.Conv1D = UPM_Conv1D
     transformers.activations.NewGELUActivation = UPM_NewGELUActivation
     transformers.activations.ACT2FN["gelu_new"] = (UPM_NewGELUActivation)  # classes are hardcoded in ACT2FN     )
     transformers.activations.ACT2FN["silu"] = (UPM_SiLUActivation) # classes are hardcoded in ACT2FN
@@ -503,11 +548,17 @@ def profiler_init():
 
     # #qwen2.5-vl
     torch.nn.Conv3d = UPM_Conv3D
-    transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VisionPatchEmbed = UPM_Qwen2_5_VisionPatchEmbed
+    # transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VisionPatchEmbed = UPM_Qwen2_5_VisionPatchEmbed # this should not be included. It is a Conv3d inside.
     transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VisionRotaryEmbedding = UPM_Qwen2_5_VisionRotaryEmbedding
     transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2RMSNorm = UPM_Qwen2RMSNorm
     torch.nn.GELU = UPM_GELU
     transformers.models.qwen2_5_vl.modeling_qwen2_5_vl.Qwen2_5_VLRotaryEmbedding = UPM_Qwen2_5_VLRotaryEmbedding
+
+    # GLM4.1v-9B-Thinking
+    transformers.models.glm4v.modeling_glm4v.Glm4vRMSNorm = UPM_Glm4vRMSNorm
+    transformers.models.glm4v.modeling_glm4v.Glm4vVisionRotaryEmbedding = UPM_Glm4vVisionRotaryEmbedding
+    transformers.models.glm4v.modeling_glm4v.Glm4vTextRotaryEmbedding = UPM_Glm4vTextRotaryEmbedding
+
 
 
 def profiler_start(

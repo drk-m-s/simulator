@@ -12,6 +12,19 @@ from .sim_architectures import HOST
 import upmem_llm_framework.sim_architectures
 from .utils import add_dictionaries
 
+class layer_profile:
+    def __init__(self, uniq_id, name, n_layer, context, dim_in, dim_out, obj=None):
+        self.id = uniq_id
+        self.name = name # e.g., "Linear", "LlamaRMSNorm", "SiLUActivation"
+        self.n_layer = n_layer # Layer number in the model
+        self.context = context # e.g., "q_proj", "k_proj", "LlamaRMSNorm"
+        self.dim_in = dim_in 
+        self.dim_out = dim_out
+        self.exec_time = 0
+        self.exec_nums = 0
+        self.energy = {}
+        self.obj = obj # Reference to the actual PyTorch layer
+
 class Simulator:
 
     def __init__(
@@ -41,7 +54,7 @@ class Simulator:
     def start_gen(self):
         self.sum = False
 
-    def map_layers(self, mapping, layer_attn_ctxt="", moe_end="", experts_per_token=2):
+    def map_layers(self, mapping, layer_attn_ctxt="", moe_end="", experts_per_token=2) -> None:
         self.layer_mapping = mapping
         self.layer_attn_ctxt = layer_attn_ctxt
         if self.verbose:
@@ -85,10 +98,7 @@ class Simulator:
     def simulate_attn(self, input_shape, weight_shape) -> tuple[float, dict, dict]:
         '''
         This function models the core attention computation: Attention(Q,K,V) = softmax(QK^T)V.
-        input_shape is usually a torch.Size object representing:
-            3D Case: [batch_size, sequence_length, hidden_dim]
-            2D Case: [sequence_length, hidden_dim]
-            1D Case: [hidden_dim]
+        Currently not used in the simulator.
         '''
         batch_size = input_shape[0] if (len(input_shape) > 2) else 1
         n_rows = input_shape[1] if (len(input_shape) > 1) else 1 ## Sequence length
@@ -283,7 +293,7 @@ class Simulator:
 
         return time_send_ans_to_host, time_send_ans_from_host, perf, energy, moved_data
 
-    def simulate_layer(self, layer, input_shape, layer_obj, weight_shape, output_shape):
+    def simulate_layer(self, layer:layer_profile, input_shape:torch.Size, layer_obj:torch.nn.Module, weight_shape:torch.Size, output_shape:torch.Size):
         """
         Simulate a layer of the model, including the transfer to the device, computation, and
         transfer back to the host if necessary.
@@ -302,8 +312,8 @@ class Simulator:
         data_transfer = {}
 
         if self.verbose:
-            print("Simulating layer:", layer.context, "n_layer:", layer.n_layer)
-
+            print("------------------------------------------------------------------------------------------------------")
+            print("#",layer.id, "Simulating layer:", layer.name, "| Context:", layer.context, "| n_layer:", layer.n_layer)
         (
             time_send_ans_to_host,
             time_send_ans_from_host,
@@ -371,7 +381,7 @@ class Simulator:
 
         return total_time, total_perf, total_energy, data_transfer
 
-    def simulate_function(self, function, context, input_shape, output_shape):
+    def simulate_function(self, function:str, context:str, input_shape:torch.Size, output_shape:torch.Size):
 
         if self.verbose:
             print(

@@ -392,6 +392,8 @@ class Base_architecture:
 
     def compute_ns_by_layer(self, input_shape, layer_obj, weight_shape, load_input=False, load_weight=True):
         
+        if self.verbose:
+            print(f"Compute_ns_by_layer {layer_obj} with type {type(layer_obj)}")
         tflops = self.get_tflops_by_layer(input_shape, layer_obj, weight_shape)
 
         data_size_bytes = self.get_moved_data_bytes(
@@ -506,7 +508,7 @@ class Base_architecture:
 
         if self.verbose:
             print(
-                "Computing scaled_dot_product:",
+                "compute_scaled_dot_product_ns:",
                 query_shape,
                 "x",
                 kt_shape,
@@ -556,7 +558,7 @@ class Base_architecture:
 
         if self.verbose:
             print(
-                "Computing matmul:",
+                "compute_matmul_ns:",
                 shapeA,
                 "x",
                 shapeB,
@@ -590,7 +592,7 @@ class Base_architecture:
 
         if self.verbose:
             print(
-                "Computing Activation",
+                "compute_activation_ns:",
                 activation,
                 ":",
                 data_shape,
@@ -620,7 +622,7 @@ class Base_architecture:
 
         if self.verbose:
             print(
-                "Computing RMSNorm:", data_shape, "in", compute_time_ns, "with", energy
+                "compute_RMSNorm_ns:", data_shape, "in", compute_time_ns, "with", energy
             )
 
         return compute_time_ns, performance, energy
@@ -643,7 +645,7 @@ class Base_architecture:
 
         if self.verbose:
             print(
-                "Computing softmax:", data_shape, "in", compute_time_ns, "with", energy
+                "compute_softmax_ns:", data_shape, "in", compute_time_ns, "with", energy
             )
 
         return compute_time_ns, performance, energy
