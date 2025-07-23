@@ -42,6 +42,7 @@ tokenizer = transformers.AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-ch
 #		"norm"            : "PIM-AI-1chip,t",
 #		"lm_head"         : "PIM-AI-4chip,t"
 #}
+
 layer_mapping = {
         "LlamaRMSNorm"    : options.device,
         "q_proj"	      : options.device,
@@ -84,74 +85,6 @@ gen_text = tokenizer.batch_decode(gen_tokens)
 print (gen_text)
 
 sys.exit()
-
-
-# print ("Batch 10")
-# prompt_batch = [prompt] * 10
-# input_ids = tokenizer(prompt_batch, return_tensors="pt")
-# print (input_ids.data["input_ids"][0].shape)
-
-# upmem_layers.profiler_start(layer_mapping, layer_attn_ctxt = layer_attn_ctxt)
-# gen_tokens = model.generate(**input_ids,
-#                             do_sample=True,
-#                             temperature=0.9,
-# 							min_length=128,
-#                             max_length=128)
-# upmem_layers.profiler_end  ()
-
-# print ("Batch 30")
-# prompt_batch = [prompt] * 30
-# input_ids = tokenizer(prompt_batch, return_tensors="pt")
-# print (input_ids.data["input_ids"][0].shape)
-
-# upmem_layers.profiler_start(layer_mapping, layer_attn_ctxt = layer_attn_ctxt)
-# gen_tokens = model.generate(**input_ids,
-#                             do_sample=True,
-#                             temperature=0.9,
-# 							min_length=128,
-#                             max_length=128)
-# upmem_layers.profiler_end  ()
-
-# print ("Batch 40")
-# prompt_batch = [prompt] * 40
-# input_ids = tokenizer(prompt_batch, return_tensors="pt")
-# print (input_ids.data["input_ids"][0].shape)
-
-# upmem_layers.profiler_start(layer_mapping, layer_attn_ctxt = layer_attn_ctxt)
-# gen_tokens = model.generate(**input_ids,
-#                             do_sample=True,
-#                             temperature=0.9,
-# 							min_length=128,
-#                             max_length=128)
-# upmem_layers.profiler_end  ()
-
-# print ("Batch 200")
-# prompt_batch = [prompt] * 200
-# input_ids = tokenizer(prompt_batch, return_tensors="pt")
-# print (input_ids.data["input_ids"][0].shape)
-
-# upmem_layers.profiler_start(layer_mapping, layer_attn_ctxt = layer_attn_ctxt)
-# gen_tokens = model.generate(**input_ids,
-#                             do_sample=True,
-#                             temperature=0.9,
-# 							min_length=128,
-#                             max_length=128)
-# upmem_layers.profiler_end  ()
-
-# Batching (from https://lukesalamone.github.io/posts/what-are-attention-masks/)
-# tokenizer.padding_side = "left"
-# tokenizer.pad_token = tokenizer.eos_token
-# 
-# sentences = ["It will rain in the",
-#             "I want to eat a big bowl of",
-#             "My dog is"]
-# inputs = tokenizer(sentences, return_tensors="pt", padding=True)
-
-
-
-#gen_text = tokenizer.batch_decode(gen_tokens)[0]
-# gen_text = tokenizer.batch_decode(gen_tokens)
-# print (gen_text)
 
 
 ## torch profiler snippet
