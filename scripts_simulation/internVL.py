@@ -6,6 +6,8 @@ from decord import VideoReader, cpu
 from PIL import Image
 from torchvision.transforms.functional import InterpolationMode
 from transformers import AutoModel, AutoTokenizer
+import requests
+import os
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -82,6 +84,15 @@ def load_image(image_file, input_size=448, max_num=12):
     return pixel_values
 
 
+
+# Download the image from the internet
+image_url = "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg"
+image_path = "./examples/image1.jpg"
+os.makedirs(os.path.dirname(image_path), exist_ok=True)  # Ensure directory exists
+response_img = requests.get(image_url)
+with open(image_path, "wb") as f:
+    f.write(response_img.content)
+
 # If you set `load_in_8bit=True`, you will need two 80GB GPUs.
 # If you set `load_in_8bit=False`, you will need at least three 80GB GPUs.
 path = 'OpenGVLab/InternVL3-8B'
@@ -96,7 +107,7 @@ model = AutoModel.from_pretrained(
 tokenizer = AutoTokenizer.from_pretrained(path, trust_remote_code=True, use_fast=False)
 
 # set the max number of tiles in `max_num`
-pixel_values = load_image('./examples/image1.jpg', max_num=12).to(torch.bfloat16).cuda()
+pixel_values = load_image(image_path, max_num=12).to(torch.bfloat16).cuda()
 generation_config = dict(max_new_tokens=1024, do_sample=True)
 
 # single-image single-round conversation (单图单轮对话)
