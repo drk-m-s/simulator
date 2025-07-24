@@ -108,8 +108,8 @@ messages = [
             {
                 "type": "image",
                 "image": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg",
-                "resized_height": 480,
-                "resized_width": 640,
+                "resized_height": 1180,
+                "resized_width": 1280,
             },
             {"type": "text", "text": dummy_text},
         ],
@@ -152,7 +152,7 @@ print("Total input tokens:", inputs.input_ids.shape[1])
 print ("in:", inputs.input_ids.shape[1], "out:", options.out_tokens)
 
 
-# Inference: Generation of the output
+# # Inference: Generation of the output
 generated_ids = model.generate(**inputs, min_new_tokens=options.out_tokens, max_new_tokens=options.out_tokens+1)
 generated_ids_trimmed = [
     out_ids[len(in_ids) :] for in_ids, out_ids in zip(inputs.input_ids, generated_ids)
