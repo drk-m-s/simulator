@@ -6,6 +6,8 @@
 # C extensions
 *.so
 
+examples/
+
 # Distribution / packaging
 .Python
 build/
