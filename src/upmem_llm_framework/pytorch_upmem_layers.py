@@ -58,10 +58,16 @@ def get_arguments():
         help="Simulate compute intensive operations. Note that some operations are still performed due to constraints in inputs/outputs of other layer/functions. CAUTION: Output tokens will be affected",
     )
     parser.add_argument(
-        "--sim-data-type",
+        "--sim-weights-data-type",
         choices=["int4", "int8", "float16", "bfloat16", "float32"],
-        default="bfloat16",
-        help="Set the datatype for weights and inputs.",
+        default="int4",
+        help="Set the datatype for weights.",
+    )
+    parser.add_argument(
+        "--sim-activation-data-type",
+        choices=["int4", "int8", "float16", "bfloat16", "float32"],
+        default="int4",
+        help="Set the datatype for activations.",
     )
     parser.add_argument(
         "--sim-num-key-value-heads",
@@ -462,6 +468,38 @@ class UPM_Glm4vTextRotaryEmbedding(transformers.models.glm4v.modeling_glm4v.Glm4
         profiler.forward_end(shape, context, layer_obj=self)
         return cos, sin
 
+## For Mistral-7B-Instruct-v0.3
+
+class UPM_MistralRMSNorm(transformers.models.mistral.modeling_mistral.MistralRMSNorm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        profiler.add(self, get_context())
+
+    def forward(self, hidden_states):
+        context = get_context()
+        profiler.forward_start(hidden_states.shape)
+        input_dtype = hidden_states.dtype
+        hidden_states = hidden_states.to(torch.float32)
+        variance = hidden_states.pow(2).mean(-1, keepdim=True)
+        hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+        out = self.weight * hidden_states.to(input_dtype)
+        profiler.forward_end(out.shape, context, layer_obj=self)
+        return out
+
+class UPM_MistralRotaryEmbedding(transformers.models.mistral.modeling_mistral.MistralRotaryEmbedding):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        profiler.add(self, get_context())
+
+    def forward(self, x, position_ids):
+        context = get_context()
+        shape = x.shape
+        profiler.forward_start(shape)
+        x = super().forward(x, position_ids)
+        profiler.forward_end(shape, context, layer_obj=self)
+        return x
+
+
 __pytorch_nn_functional_softmax = torch.nn.functional.softmax
 
 # TODO: change logic here to not use stringly types
@@ -559,7 +597,9 @@ def profiler_init():
     transformers.models.glm4v.modeling_glm4v.Glm4vVisionRotaryEmbedding = UPM_Glm4vVisionRotaryEmbedding
     transformers.models.glm4v.modeling_glm4v.Glm4vTextRotaryEmbedding = UPM_Glm4vTextRotaryEmbedding
 
-
+    # Mistral-7B-Instruct-v0.3
+    transformers.models.mistral.modeling_mistral.MistralRMSNorm = UPM_MistralRMSNorm
+    transformers.models.mistral.modeling_mistral.MistralRotaryEmbedding = UPM_MistralRotaryEmbedding
 
 def profiler_start(
     layer_mapping={},

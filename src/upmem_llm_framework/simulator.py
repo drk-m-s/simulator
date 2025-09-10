@@ -29,12 +29,14 @@ class Simulator:
 
     def __init__(
         self,
-        data_type_bytes=2,
+        weights_data_type_bytes=0.5,
+        activation_data_type_bytes=2,
         sliding_window=-1,
         num_key_value_heads=-1,
         verbose=False,
     ):
-        self.data_type_bytes = data_type_bytes
+        self.weights_data_type_bytes = weights_data_type_bytes
+        self.activation_data_type_bytes = activation_data_type_bytes
         self.layer_mapping = {}
         self.layer_attn_ctxt = ""
         self.use_kv_cache = True
@@ -85,7 +87,8 @@ class Simulator:
             print("Device name does not exist. Exiting...")
             sys.exit(-1)
         new_device = new_class(
-            data_type_bytes=self.data_type_bytes,
+            weights_data_type_bytes=self.weights_data_type_bytes,
+            activation_data_type_bytes=self.activation_data_type_bytes,
             sliding_window=self.sliding_window,
             num_key_value_heads=self.num_key_value_heads,
             verbose=self.verbose,

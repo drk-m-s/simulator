@@ -37,7 +37,9 @@ class Base_architecture:
         memory=1,
         mem_bw_GBs=1,
         mem_pj_per_bit=1,
-        data_type_bytes=2,  # float16
+        # data_type_bytes=2,  # float16
+        weights_data_type_bytes=2,  # float16
+        activation_data_type_bytes=2,  # float16
         # 3000 cycles per row of 2048 elements --> 1.4 cycles / element
         # assuming 1 GHz, 1.5 ns / element, parallelized accross 4 chips -> 0.37
         softmax_ns_per_element=0.4,  # ns, considering it cycles in 1GHz config
@@ -69,7 +71,9 @@ class Base_architecture:
         self.mem_bw_GBs = mem_bw_GBs
         self.mem_pj_per_bit = mem_pj_per_bit
 
-        self.data_type_bytes = data_type_bytes
+        # self.data_type_bytes = data_type_bytes
+        self.weights_data_type_bytes = weights_data_type_bytes
+        self.activation_data_type_bytes = activation_data_type_bytes
 
         self.softmax_ns_per_element = softmax_ns_per_element
         self.RMSNorm_ns_per_element = RMSNorm_ns_per_element
@@ -85,7 +89,7 @@ class Base_architecture:
     # Defined TFLOPS are defined for float16,
     # assume that performance is doubled if data type is demoted
     def adjust_for_quantization(self):
-        ratio = 2 / self.data_type_bytes  # Assume pj_per_tflop corresponds to float16
+        ratio = 2 / self.weights_data_type_bytes  # Assume pj_per_tflop corresponds to float16
         self.pj_per_tflop = self.pj_per_tflop / ratio
         # self.tflops = self.tflops * (2 / self.data_type_bytes)
 
@@ -250,8 +254,13 @@ class Base_architecture:
 
         weight_size = weight_shape[1] * weight_shape[0] if load_weight else 0
         input_size = batch_size * n_heads * n_rows * n_columns if load_input else 0
-        # output_size = batch_size * n_rows * weight_shape[1]
-        return self.data_type_bytes * (weight_size + input_size)  # + output_size)
+        output_size = batch_size * n_rows * weight_shape[1]
+
+        weight_bytes = self.weights_data_type_bytes * weight_size
+        input_bytes = self.activation_data_type_bytes * input_size
+        output_bytes = self.activation_data_type_bytes * output_size
+
+        return weight_bytes + input_bytes + output_bytes
 
     # KV cache load
     def load_data(self, input_shape: torch.Size) -> tuple[float, dict, dict]:
@@ -260,7 +269,7 @@ class Base_architecture:
         n_rows = input_shape[-2] if (len(input_shape) > 1) else 1
         n_columns = input_shape[-1]
 
-        data_size_bytes = self.data_type_bytes * (
+        data_size_bytes = self.activation_data_type_bytes * (
             batch_size * n_rows * n_heads * n_columns
         )
         # B / (GB/s) --> s/G --> ns
@@ -302,7 +311,7 @@ class Base_architecture:
             else self.device_to_host_bw_GBs
         )
 
-        data_size_bytes = self.data_type_bytes * (
+        data_size_bytes = self.activation_data_type_bytes * (
             batch_size * n_heads * n_rows * n_columns * generated_tokens
         )
         # B / (GB/s) --> s / G --> ns

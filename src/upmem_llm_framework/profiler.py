@@ -59,15 +59,25 @@ class UPM_Profiler:
         self.sim_sliding_window = options.sim_sliding_window
         self.sim_num_key_value_heads = options.sim_num_key_value_heads
 
-        self.sim_data_type = options.sim_data_type
+        self.sim_weights_data_type = options.sim_weights_data_type
 
-        self.sim_data_type_bytes = {
+        self.sim_activation_data_type = options.sim_activation_data_type
+
+        self.sim_weights_data_type_bytes = {
             "int4": 0.5,
             "int8": 1,
             "float16": 2,
             "bfloat16": 2,
             "float32": 4,
-        }.get(self.sim_data_type)
+        }.get(self.sim_weights_data_type)
+
+        self.sim_activation_data_type_bytes = {
+            "int4": 0.5,
+            "int8": 1,
+            "float16": 2,
+            "bfloat16": 2,
+            "float32": 4,
+        }.get(self.sim_activation_data_type)
 
         self.simulator = None
         if self.simulation:
@@ -75,7 +85,8 @@ class UPM_Profiler:
 
     def create_arch_simulator(self) -> Simulator:
         return Simulator(
-            data_type_bytes=self.sim_data_type_bytes,
+            weights_data_type_bytes=self.sim_weights_data_type_bytes,
+            activation_data_type_bytes=self.sim_activation_data_type_bytes,
             sliding_window=self.sim_sliding_window,
             num_key_value_heads=self.sim_num_key_value_heads,
             verbose=self.options.sim_verbose,
@@ -334,8 +345,10 @@ class UPM_Profiler:
         print(
             "Total time (SUM + GEN):",
             inference_time_sec,
-            "with data type:",
-            self.sim_data_type,
+            "with weights data type:",
+            self.sim_weights_data_type,
+            "activation data type:",
+            self.sim_activation_data_type,
             "batch size:",
             self.batch_size,
         )
@@ -550,6 +563,14 @@ class UPM_Profiler:
             dim_out = 1
         elif issubclass(transformers.models.glm4v.modeling_glm4v.Glm4vTextRotaryEmbedding, type(layer)):
             name_layer = "Glm4vTextRotaryEmbedding"
+            dim_in = 1
+            dim_out = 1
+        elif issubclass(transformers.models.mistral.modeling_mistral.MistralRMSNorm, type(layer)):
+            name_layer = "MistralRMSNorm"
+            dim_in = 1
+            dim_out = 1
+        elif issubclass(transformers.models.mistral.modeling_mistral.MistralRotaryEmbedding, type(layer)):
+            name_layer = "MistralRotaryEmbedding"
             dim_in = 1
             dim_out = 1
         else:
