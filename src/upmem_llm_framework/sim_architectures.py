@@ -38,10 +38,66 @@ class WD1(Base_architecture):
         self.mem_pj_per_bit = 1.3 #1.3 from DRAM to Logic + 0.67 for DRAM 
 
         # Compute
-        self.tflops = compute_efficiency_ratio * 32
-        if self.data_type_bytes == 0.5:
+        # self.tflops = compute_efficiency_ratio * 16
+        self.tflops =  16
+        if self.weights_data_type_bytes == 0.5:
             self.tflops = compute_efficiency_ratio * 64
-        self.pj_per_tflop = 0.8 * 1e12 
+        self.pj_per_tflop = 0.8 * 1e12
+
+class WD1_Test(Base_architecture):
+    
+    def __init__(self, *args, **kwargs):
+        self.name = "WD1_Test"
+        super().__init__(*args, **kwargs)
+
+        # Effectiveness ratio
+        memory_bw_efficiency_ratio = 0.7
+        compute_efficiency_ratio = 0.7
+
+        # HOST communication
+        self.host_to_device_bw_GBs = memory_bw_efficiency_ratio * 3000
+        self.host_to_device_pj_per_bit = 32 # Through PCIe
+        self.device_to_host_bw_GBs = memory_bw_efficiency_ratio * 3000
+        self.device_to_host_pj_per_bit = 32 # Through PCIe
+
+        # Device memory (shared memory like)
+        self.mem_bw_GBs = memory_bw_efficiency_ratio * 3000
+        self.mem_pj_per_bit = 1.3 #1.3 from DRAM to Logic + 0.67 for DRAM 
+
+        # Compute
+        # self.tflops = compute_efficiency_ratio * 16
+        self.tflops =  50
+        if self.weights_data_type_bytes == 0.5:
+            self.tflops = compute_efficiency_ratio * 64
+        self.pj_per_tflop = 0.8 * 1e12
+
+
+class WD1_TXNPU(Base_architecture):
+    
+    def __init__(self, *args, **kwargs):
+        self.name = "WD1_TXNPU"
+        super().__init__(*args, **kwargs)
+
+        # Effectiveness ratio
+        memory_bw_efficiency_ratio = 0.7
+        compute_efficiency_ratio = 0.7
+
+        # HOST communication
+        self.host_to_device_bw_GBs = memory_bw_efficiency_ratio * 1600
+        self.host_to_device_pj_per_bit = 32 # Through PCIe
+        self.device_to_host_bw_GBs = memory_bw_efficiency_ratio * 1600
+        self.device_to_host_pj_per_bit = 32 # Through PCIe
+
+        # Device memory (shared memory like)
+        self.mem_bw_GBs = memory_bw_efficiency_ratio * 1600
+        self.mem_pj_per_bit = 1.3 #1.3 from DRAM to Logic + 0.67 for DRAM 
+
+        # Compute
+        # self.tflops = compute_efficiency_ratio * 16
+        self.tflops = 24
+        if self.weights_data_type_bytes == 0.5:
+            self.tflops = compute_efficiency_ratio * 96
+        self.pj_per_tflop = 0.8 * 1e12
 
 class WD1_600(Base_architecture):
     
@@ -67,10 +123,77 @@ class WD1_600(Base_architecture):
         self.mem_pj_per_bit = 1.3
 
         # Compute
-        self.tflops = frequency_lower_ratio * compute_efficiency_ratio * 32
-        if self.data_type_bytes == 0.5:
-            self.tflops = frequency_lower_ratio * compute_efficiency_ratio * 64
+        # self.tflops = compute_efficiency_ratio * 16
+        self.tflops = 16 
+        if self.weights_data_type_bytes == 0.5:
+            self.tflops = compute_efficiency_ratio * 64 * frequency_lower_ratio
         self.pj_per_tflop = 0.8 * 1e12
+
+class WD1_600_TXNPU(Base_architecture):
+    
+    def __init__(self, *args, **kwargs):
+        self.name = "WD1_600_TXNPU"
+        super().__init__(*args, **kwargs)
+
+        # Effectiveness ratio
+        memory_bw_efficiency_ratio = 0.7
+        compute_efficiency_ratio = 0.7
+        
+        # Frequency lower ratio as compared to 1GHz
+        frequency_lower_ratio = 0.6
+
+        # HOST communication
+        self.host_to_device_bw_GBs = frequency_lower_ratio * memory_bw_efficiency_ratio * 1600
+        self.host_to_device_pj_per_bit = 32
+        self.device_to_host_bw_GBs = frequency_lower_ratio * memory_bw_efficiency_ratio * 1600
+        self.device_to_host_pj_per_bit = 32
+
+        # Device memory (shared memory like)
+        self.mem_bw_GBs = frequency_lower_ratio * memory_bw_efficiency_ratio * 1600
+        self.mem_pj_per_bit = 1.3
+
+        # Compute
+        # self.tflops = compute_efficiency_ratio * 16
+        self.tflops = 24 
+        if self.weights_data_type_bytes == 0.5:
+            self.tflops = compute_efficiency_ratio * 96 * frequency_lower_ratio
+        self.pj_per_tflop = 0.8 * 1e12
+
+class Jetson_Orin(Base_architecture):
+    def __init__(self, *args, **kwargs):
+        self.name = "Jetson_Orin"
+        super().__init__(*args, **kwargs)
+        # HOST communication
+        self.host_to_device_bw_GBs = 204.8
+        self.host_to_device_pj_per_bit = 20
+        self.device_to_host_bw_GBs = 204.8
+        self.device_to_host_pj_per_bit = 20
+        # Device memory (shared memory like)
+        self.mem_bw_GBs = 204.8
+        self.mem_pj_per_bit = 20
+        # Compute
+        self.tflops = 100
+        if self.weights_data_type_bytes == 0.5:
+            self.tflops = 400
+        self.pj_per_tflop = 0.5 * 1e12
+        
+class Qualcomm_8397(Base_architecture):
+    def __init__(self, *args, **kwargs):
+        self.name = "Qualcomm_8397"
+        super().__init__(*args, **kwargs)
+        # HOST communication
+        self.host_to_device_bw_GBs = 273
+        self.host_to_device_pj_per_bit = 10
+        self.device_to_host_bw_GBs = 273
+        self.device_to_host_pj_per_bit = 10
+        # Device memory (shared memory like)
+        self.mem_bw_GBs = 273
+        self.mem_pj_per_bit = 10
+        # Compute
+        self.tflops = 320
+        if self.weights_data_type_bytes == 0.5:
+            self.tflops = 640
+        self.pj_per_tflop = 0.5 * 1e12
 
 class DGX100(Base_architecture):
 
@@ -191,6 +314,30 @@ class A800(Base_architecture):
         self.SiLU_ns_per_element = 0.6 / (16 * 2 * 4)
         self.RMSNorm_ns_per_element = 1.04 / (16 * 2 * 4)
 
+class A100(Base_architecture):
+    
+    def __init__(self, *args, **kwargs):
+        self.name = "A100"
+        super().__init__(*args, **kwargs)
+
+        # HOST communication
+        self.host_to_device_bw_GBs = 64
+        self.host_to_device_pj_per_bit = 27
+        self.device_to_host_bw_GBs = 64
+        self.device_to_host_pj_per_bit = 27
+
+        # Device memory (shared memory like)
+        self.mem_bw_GBs = 1935
+        self.mem_pj_per_bit = 7
+
+        # Compute
+        self.tflops = 312
+        self.pj_per_tflop = 0.5 * 1e12
+
+        # Assuming a A100 is equivalent to 128 AI PIM cores (8 DIMMs) due to server size
+        self.softmax_ns_per_element = 0.4 / (16 * 2 * 4)
+        self.SiLU_ns_per_element = 0.6 / (16 * 2 * 4)
+        self.RMSNorm_ns_per_element = 1.04 / (16 * 2 * 4)
 
 class H20(Base_architecture):
 
@@ -290,6 +437,50 @@ class A6000(Base_architecture):
         self.tflops = 155
         self.pj_per_tflop = 0.5 * 1e12
 
+class Intel_Ultra5_125H(Base_architecture):
+    
+    def __init__(self, *args, **kwargs):
+        self.name = "Intel_Ultra_125H"
+        super().__init__(*args, **kwargs)   
+    
+        # HOST communication
+        self.host_to_device_bw_GBs = 119
+        self.host_to_device_pj_per_bit = 20
+        self.device_to_host_bw_GBs = 119
+        self.device_to_host_pj_per_bit = 20
+
+        # Device memory (shared memory like)
+        self.mem_bw_GBs = 119
+        self.mem_pj_per_bit = 20
+
+        # Compute
+        self.tflops = 11.5
+        if self.weights_data_type_bytes == 0.5:
+            self.tflops = 46
+        self.pj_per_tflop = 0.5 * 1e12
+
+class Intel_Ultra7_225H(Base_architecture):
+    
+    def __init__(self, *args, **kwargs):
+        self.name = "Intel_Ultra7_225H"
+        super().__init__(*args, **kwargs)
+
+        # HOST communication
+        self.host_to_device_bw_GBs = 134
+        self.host_to_device_pj_per_bit = 20
+        self.device_to_host_bw_GBs = 134
+        self.device_to_host_pj_per_bit = 20
+
+        # Device memory (shared memory like)
+        self.mem_bw_GBs = 134
+        self.mem_pj_per_bit = 20
+
+        # Compute
+        self.tflops = 37
+        if self.weights_data_type_bytes == 0.5:
+            self.tflops = 148
+        self.pj_per_tflop = 0.5 * 1e12
+
 
 class A17Pro(Base_architecture):
 
@@ -308,9 +499,10 @@ class A17Pro(Base_architecture):
         self.mem_pj_per_bit = 20
 
         # Compute
-        self.tflops = 4.3
-        if self.data_type_bytes == 0.5:
-            self.tflops = 35
+        self.tflops = 35
+        # self.tflops = 4.3
+        # if self.data_type_bytes == 0.5:
+        #     self.tflops = 35
         self.pj_per_tflop = 0.4 * 1e12
 
 
@@ -332,7 +524,7 @@ class Dimensity9300(Base_architecture):
 
         # Compute
         self.tflops = 6
-        if self.data_type_bytes == 0.5:
+        if self.weights_data_type_bytes == 0.5:
             self.tflops = 33
         self.pj_per_tflop = 0.4 * 1e12
 
@@ -355,7 +547,7 @@ class Snapdragon8gen3(Base_architecture):
 
         # Compute
         self.tflops = 4.73
-        if self.data_type_bytes == 0.5:
+        if self.weights_data_type_bytes == 0.5:
             self.tflops = 34
         self.pj_per_tflop = 0.4 * 1e12
 
@@ -377,7 +569,7 @@ class Tenstorrent(Base_architecture):
 
         # Compute
         self.tflops = 30
-        if self.data_type_bytes == 0.5:
+        if self.weights_data_type_bytes == 0.5:
             self.tflops = 60
         self.pj_per_tflop = 0.4 * 1e12
 
@@ -400,7 +592,7 @@ class SAM_LPDDR5PIM(Base_architecture):
 
         # Compute
         self.tflops = 0.1024
-        if self.data_type_bytes == 0.5:
+        if self.weights_data_type_bytes == 0.5:
             self.tflops = 4 * self.tflops
         self.pj_per_tflop = 0.8 * 1e12
 
@@ -422,7 +614,7 @@ class PIM_AI_1chip(Base_architecture):
 
         # Compute
         self.tflops = 5
-        if self.data_type_bytes == 0.5:
+        if self.weights_data_type_bytes == 0.5:
             self.tflops = 32
         self.pj_per_tflop = 0.4 * 1e12
 
@@ -445,7 +637,7 @@ class PIM_AI_4chip(Base_architecture):
 
         # Compute
         self.tflops = 5 * 4
-        if self.data_type_bytes == 0.5:
+        if self.weights_data_type_bytes == 0.5:
             self.tflops = 32 * 4
         self.pj_per_tflop = 0.4 * 1e12
 
@@ -471,7 +663,7 @@ class PIM_AI_2chip(Base_architecture):
 
         # Compute
         self.tflops = 5 * 2
-        if self.data_type_bytes == 0.5:
+        if self.weights_data_type_bytes == 0.5:
             self.tflops = 32 * 2
         self.pj_per_tflop = 0.4 * 1e12
 
