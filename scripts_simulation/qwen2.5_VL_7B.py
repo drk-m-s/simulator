@@ -100,6 +100,7 @@ def generate_exact_text(processor, options):
 
 # Generate dummy text sequence
 dummy_text = generate_exact_text(processor, options)
+print(f"Dummy text is: {dummy_text}")
 
 messages = [
     {
@@ -108,8 +109,8 @@ messages = [
             {
                 "type": "image",
                 "image": "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg",
-                "resized_height": 1180,
-                "resized_width": 1280,
+                "resized_height": 364,
+                "resized_width": 448,
             },
             {"type": "text", "text": dummy_text},
         ],
