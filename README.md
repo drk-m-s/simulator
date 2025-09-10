@@ -1,11 +1,6 @@
-UPMEM LLM Framework
+AI Chip LLM Simulation Framework
 ===================
-
-Copyright (c) 2024, UPMEM 
-UPMEM S.A.S France property - UPMEM confidential information covered by NDA
-For UPMEM partner internal use only - no modification allowed without permission of UPMEM
-
-UPMEM Framework for profiling / simulation
+Based on UPMEM Framework for profiling / simulation
 ==========================================
 
 This library allows
