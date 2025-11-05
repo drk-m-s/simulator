@@ -159,6 +159,34 @@ class WD1_600_TXNPU(Base_architecture):
             self.tflops = compute_efficiency_ratio * 96 * frequency_lower_ratio
         self.pj_per_tflop = 0.8 * 1e12
 
+
+class RK_1820(Base_architecture):
+    def __init__(self, *args, **kwargs):
+        self.name = "RK_1820"
+        super().__init__(*args, **kwargs)
+
+        # Effectiveness ratio
+        memory_bw_efficiency_ratio = 0.5
+        compute_efficiency_ratio = 0.65
+
+        # HOST communication
+        self.host_to_device_bw_GBs =  memory_bw_efficiency_ratio * 1000
+        self.host_to_device_pj_per_bit = 32
+        self.device_to_host_bw_GBs =  memory_bw_efficiency_ratio * 1000
+        self.device_to_host_pj_per_bit = 32
+
+        # Device memory (shared memory like)
+        self.mem_bw_GBs =  memory_bw_efficiency_ratio * 1000
+        self.mem_pj_per_bit = 3.0
+
+        # Compute
+        # self.tflops = compute_efficiency_ratio * 16
+        self.tflops = compute_efficiency_ratio * 5
+        if self.weights_data_type_bytes == 0.5:
+            self.tflops = compute_efficiency_ratio * 10
+        self.pj_per_tflop = 0.8 * 1e12
+
+
 class Jetson_Orin(Base_architecture):
     def __init__(self, *args, **kwargs):
         self.name = "Jetson_Orin"
