@@ -44,7 +44,9 @@ layer_mapping = {
         "input_layernorm" : options.device,
         "post_attention_layernorm": options.device,
         "norm"            : options.device,
-        "lm_head"         : options.device
+        "lm_head"         : options.device,
+        "ln_q"            : options.device,  # Add visual merger layers
+        "mlp"             : options.device,
 }
 
 
@@ -116,7 +118,13 @@ messages = [
     }
 ]
 
-upmem_layers.profiler_start(layer_mapping, batch_size=options.bs)
+# Modified profiler_start call with visual_end parameter
+upmem_layers.profiler_start(
+    layer_mapping, 
+    batch_size=options.bs,
+    visual_end="ln_q",  # Last unique layer before language model starts
+    last_layer="lm_head"  # Last layer of language model
+)
 
 print(f"Simulating with device: {options.device}")
 

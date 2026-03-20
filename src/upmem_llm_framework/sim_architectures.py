@@ -44,31 +44,31 @@ class WD1(Base_architecture):
             self.tflops = compute_efficiency_ratio * 64
         self.pj_per_tflop = 0.8 * 1e12
 
-class WD1_Test(Base_architecture):
+class WD1_Downsize(Base_architecture):
     
     def __init__(self, *args, **kwargs):
-        self.name = "WD1_Test"
+        self.name = "WD1_Downsize"
         super().__init__(*args, **kwargs)
 
         # Effectiveness ratio
-        memory_bw_efficiency_ratio = 0.7
+        memory_bw_efficiency_ratio = 0.5
         compute_efficiency_ratio = 0.7
 
         # HOST communication
-        self.host_to_device_bw_GBs = memory_bw_efficiency_ratio * 3000
+        self.host_to_device_bw_GBs = memory_bw_efficiency_ratio * 1600
         self.host_to_device_pj_per_bit = 32 # Through PCIe
-        self.device_to_host_bw_GBs = memory_bw_efficiency_ratio * 3000
+        self.device_to_host_bw_GBs = memory_bw_efficiency_ratio * 1600
         self.device_to_host_pj_per_bit = 32 # Through PCIe
 
         # Device memory (shared memory like)
-        self.mem_bw_GBs = memory_bw_efficiency_ratio * 3000
+        self.mem_bw_GBs = memory_bw_efficiency_ratio * 1600
         self.mem_pj_per_bit = 1.3 #1.3 from DRAM to Logic + 0.67 for DRAM 
 
         # Compute
         # self.tflops = compute_efficiency_ratio * 16
-        self.tflops =  50
+        self.tflops =  13
         if self.weights_data_type_bytes == 0.5:
-            self.tflops = compute_efficiency_ratio * 64
+            self.tflops = compute_efficiency_ratio * 26
         self.pj_per_tflop = 0.8 * 1e12
 
 
@@ -205,6 +205,27 @@ class Jetson_Orin(Base_architecture):
             self.tflops = 400
         self.pj_per_tflop = 0.5 * 1e12
         
+class Orin_NX_16GB(Base_architecture):
+    def __init__(self, *args, **kwargs):
+        self.name = "Orin_NX_16GB"
+        super().__init__(*args, **kwargs)
+        # HOST communication
+        self.host_to_device_bw_GBs = 102.4
+        self.host_to_device_pj_per_bit = 20
+        self.device_to_host_bw_GBs = 102.4
+        self.device_to_host_pj_per_bit = 20
+        # Device memory (shared memory like)
+        self.mem_bw_GBs = 102.4
+        self.mem_pj_per_bit = 20
+        # Compute
+        self.tflops = 25
+        if self.weights_data_type_bytes == 0.5:
+            self.tflops = 100
+        if self.weights_data_type_bytes == 1.0:
+            self.tflops = 50
+        self.pj_per_tflop = 0.5 * 1e12
+        
+
 class Qualcomm_8397(Base_architecture):
     def __init__(self, *args, **kwargs):
         self.name = "Qualcomm_8397"

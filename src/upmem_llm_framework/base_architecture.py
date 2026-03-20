@@ -115,86 +115,91 @@ class Base_architecture:
 
      # https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html
     def get_tflops_Conv2d(self, input_shape, layer, weight_shape):
+        # Extract dimensions from input_shape
         batch_size = input_shape[-4] if (len(input_shape) > 3) else 1
-        n_channels = input_shape[-3] if (len(input_shape) > 2) else 1
-        n_height = input_shape[-2] if (len(input_shape) > 1) else 1
-        n_width = input_shape[-1]
-
-        stride = layer.stride
+        in_channels = input_shape[-3] if (len(input_shape) > 2) else 1
+        input_height = input_shape[-2] if (len(input_shape) > 1) else 1
+        input_width = input_shape[-1]
+        
+        # Get output channels from weight shape
+        out_channels = weight_shape[0]
+        
+        # Handle string padding values like 'valid' or 'same'
         padding = layer.padding
+        if isinstance(padding, str):
+            if padding.lower() == 'valid':
+                padding = (0, 0)
+            elif padding.lower() == 'same':
+                # For 'same' padding, calculate based on kernel size
+                padding = (layer.kernel_size[0] // 2, layer.kernel_size[1] // 2)
+            else:
+                padding = (0, 0)
 
-        n_height = n_height + 2 * (
-            padding[0] if isinstance(padding, tuple) else padding
-        )
-        n_width = n_width + 2 * (padding[1] if isinstance(padding, tuple) else padding)
+        # Ensure padding is a tuple
+        if isinstance(padding, int):
+            padding = (padding, padding)
 
-        # Example of how many times a kernel is applied depending on stride:
-        # | 0 | 1 | 2 | 3 | 4 | 5 |
-        # Stride 1:
-        # 00001111
-        #     11112222
-        #         22223333
-        #             33334444
-        #                 44445555
-        # Stride 2:
-        # 00001111
-        #         22223333
-        #                 44445555
+        # Ensure stride is a tuple
+        stride = layer.stride
+        if isinstance(stride, int):
+            stride = (stride, stride)
+    
+        # Ensure kernel_size is a tuple
+        kernel_size = layer.kernel_size
+        if isinstance(kernel_size, int):
+            kernel_h = kernel_w = kernel_size
+        else:
+            kernel_h = kernel_size[0]
+            kernel_w = kernel_size[1]
 
-        width_times = math.ceil(
-            (n_width - 1) / (stride[1] if isinstance(stride, tuple) else stride)
-        )
-        height_times = math.ceil(
-            (n_width - 1) / (stride[0] if isinstance(stride, tuple) else stride)
-        )
+        # Calculate output dimensions
+        output_height = (input_height + 2 * padding[0] - kernel_h) // stride[0] + 1
+        output_width = (input_width + 2 * padding[1] - kernel_w) // stride[1] + 1
 
-        # TFLOPS when applying once the kernel
-        tflops_kernel = (
-            2 * batch_size * n_channels * weight_shape[1] * weight_shape[0]
+        # TFLOPS calculation for Conv2d:
+        # For each output element, we perform kernel_h * kernel_w * in_channels multiply-accumulate operations
+        # Each MAC = 2 FLOPs (1 multiply + 1 add)
+        # Total = batch_size * out_channels * output_height * output_width * kernel_h * kernel_w * in_channels * 2
+        tflops = (
+            2 * batch_size * out_channels * output_height * output_width * 
+            kernel_h * kernel_w * in_channels
         ) / 1e12
-
-        tflops = tflops_kernel * width_times * height_times
 
         return tflops
 
     def get_tflops_Conv3d(self, input_shape, layer, weight_shape):
+        # Extract dimensions from input_shape
         batch_size = input_shape[-5] if (len(input_shape) > 4) else 1
-        n_channels = input_shape[-4] if (len(input_shape) > 3) else 1
-        n_depth = input_shape[-3] if (len(input_shape) > 2) else 1
-        n_height = input_shape[-2] if (len(input_shape) > 1) else 1
-        n_width = input_shape[-1]
+        in_channels = input_shape[-4] if (len(input_shape) > 3) else 1
+        input_depth = input_shape[-3] if (len(input_shape) > 2) else 1
+        input_height = input_shape[-2] if (len(input_shape) > 1) else 1
+        input_width = input_shape[-1]
 
-        stride = layer.stride
-        padding = layer.padding
-
-        # Apply padding to all three spatial dimensions
-        n_depth = n_depth + 2 * (
-            padding[0] if isinstance(padding, tuple) else padding
-        )
-        n_height = n_height + 2 * (
-            padding[1] if isinstance(padding, tuple) else padding
-        )
-        n_width = n_width + 2 * (
-            padding[2] if isinstance(padding, tuple) else padding
-        )
-
-        # Calculate how many times the kernel is applied in each dimension
-        depth_times = math.ceil(
-            (n_depth - 1) / (stride[0] if isinstance(stride, tuple) else stride)
-        )
-        height_times = math.ceil(
-            (n_height - 1) / (stride[1] if isinstance(stride, tuple) else stride)
-        )
-        width_times = math.ceil(
-            (n_width - 1) / (stride[2] if isinstance(stride, tuple) else stride)
-        )
-
-        # For Conv3d, weight_shape should be [out_channels, in_channels, kernel_d, kernel_h, kernel_w]
-        # But we need to handle cases where weight_shape might be shorter
+        # Get output channels from weight shape
         out_channels = weight_shape[0]
-        in_channels = weight_shape[1] if len(weight_shape) > 1 else n_channels
 
-        # Get kernel dimensions from layer attributes if weight_shape is incomplete
+        # Handle padding
+        padding = layer.padding
+        if isinstance(padding, str):
+            if padding.lower() == 'valid':
+                padding = (0, 0, 0)
+            elif padding.lower() == 'same':
+                kernel_size = layer.kernel_size
+                if isinstance(kernel_size, int):
+                    padding = (kernel_size // 2, kernel_size // 2, kernel_size // 2)
+                else:
+                    padding = (kernel_size[0] // 2, kernel_size[1] // 2, kernel_size[2] // 2)
+            else:
+                padding = (0, 0, 0)
+        elif isinstance(padding, int):
+            padding = (padding, padding, padding)
+
+        # Handle stride
+        stride = layer.stride
+        if isinstance(stride, int):
+            stride = (stride, stride, stride)
+
+        # Get kernel dimensions
         kernel_size = layer.kernel_size
         if isinstance(kernel_size, int):
             kernel_d = kernel_h = kernel_w = kernel_size
@@ -203,14 +208,18 @@ class Base_architecture:
             kernel_h = kernel_size[1]
             kernel_w = kernel_size[2]
 
-        # TFLOPS calculation for Conv3d
-        # Each output element requires kernel_d * kernel_h * kernel_w * in_channels multiply-adds
-        tflops_kernel = (
-            2 * batch_size * in_channels * kernel_d * kernel_h * kernel_w * out_channels
-        ) / 1e12
+        # Calculate output dimensions
+        output_depth = (input_depth + 2 * padding[0] - kernel_d) // stride[0] + 1
+        output_height = (input_height + 2 * padding[1] - kernel_h) // stride[1] + 1
+        output_width = (input_width + 2 * padding[2] - kernel_w) // stride[2] + 1
 
-        # Total TFLOPS considering all applications of the kernel
-        tflops = tflops_kernel * depth_times * height_times * width_times
+        # TFLOPS calculation for Conv3d:
+        # For each output element, we perform kernel_d * kernel_h * kernel_w * in_channels MAC operations
+        # Each MAC = 2 FLOPs
+        tflops = (
+            2 * batch_size * out_channels * output_depth * output_height * output_width *
+            kernel_d * kernel_h * kernel_w * in_channels
+        ) / 1e12
 
         return tflops
 

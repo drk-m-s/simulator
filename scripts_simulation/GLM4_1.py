@@ -140,6 +140,7 @@ model = Glm4vForConditionalGeneration.from_pretrained(
     torch_dtype=torch.bfloat16,
     device_map="auto",
 )
+
 inputs = processor.apply_chat_template(
     messages,
     tokenize=True,
@@ -152,7 +153,13 @@ inputs = processor.apply_chat_template(
 print("Total input tokens:", inputs["input_ids"].shape[1])
 print("in:", inputs["input_ids"].shape[1], "out:", options.out_tokens)
 
-upmem_layers.profiler_start(layer_mapping, batch_size=options.bs)
+# Modified profiler_start call with visual_end parameter
+upmem_layers.profiler_start(
+    layer_mapping, 
+    batch_size=options.bs,
+    visual_end="post_layernorm",  # Last unique layer before language model starts
+    last_layer="lm_head"  # Last layer of language model
+)
 
 print(f"Simulating with device: {options.device}")
 

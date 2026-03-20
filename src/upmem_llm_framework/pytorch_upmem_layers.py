@@ -66,7 +66,7 @@ def get_arguments():
     parser.add_argument(
         "--sim-activation-data-type",
         choices=["int4", "int8", "float16", "bfloat16", "float32"],
-        default="int4",
+        default="int4--sim",
         help="Set the datatype for activations.",
     )
     parser.add_argument(
@@ -608,6 +608,7 @@ def profiler_start(
     batch_size=1,
     moe_end="",
     experts_per_token=2,
+    visual_end="",  # Add visual_end parameter
 ):
     global options
     profiler.set_options(options)
@@ -618,6 +619,7 @@ def profiler_start(
         batch_size=batch_size,
         moe_end=moe_end,
         experts_per_token=experts_per_token,
+        visual_end=visual_end,  # Pass visual_end to profiler.start()
     )
 
 

@@ -34,6 +34,7 @@ class layer_log:
         self.name = name
         self.context = context
         self.summarization = summarization
+        self.visual_phase = 0  # Add visual phase tracking
         self.start_time = start_time
         self.input = input
         self.weights = weights
@@ -137,12 +138,14 @@ class UPM_Profiler:
                 + str(self.functions[i].exec_time / 1e6)
             )
 
-    def print_log_summary(self, show_summarization=False, show_all=False):
+    def print_log_summary(self, show_summarization=False, show_visual=False, show_all=False):
         phase = "Generation"
-        if show_summarization:
-            phase = "Summarization"
+        if show_visual:
+            phase = "Visual (ViT)"
+        elif show_summarization:
+            phase = "Summarization (Encoding)"
         if show_all:
-            phase = "All (SUM and GEN)"
+            phase = "All (ViT + SUM + GEN)"
         print("#####", phase, "Execution summary #####")
         name_ctxt = []
         summary_time = OrderedDict()
@@ -154,10 +157,15 @@ class UPM_Profiler:
         weights_shapes = OrderedDict()
         output_shapes = OrderedDict()
         for log in self.log:
-            if not show_all and not show_summarization and log.summarization:
+            is_visual = hasattr(log, 'visual_phase') and log.visual_phase
+            
+            if not show_all and not show_summarization and not show_visual and (log.summarization or is_visual):
                 continue
             if not show_all and show_summarization and not log.summarization:
                 continue
+            if not show_all and show_visual and not is_visual:
+                continue
+            
             ctxt = log.name + ":" + log.context
             if not ctxt in summary_time.keys():
                 name_ctxt.append(ctxt)
@@ -257,7 +265,10 @@ class UPM_Profiler:
             )
 
     def update_inference_perf(self, step_perf):
-        if self.simulator.sum:
+        if self.simulator.visual:
+            for key in step_perf.keys():
+                self.visual_perf[key] = self.visual_perf.get(key, 0) + step_perf[key]
+        elif self.simulator.sum:
             for key in step_perf.keys():
                 self.sum_perf[key] = self.sum_perf.get(key, 0) + step_perf[key]
         else:
@@ -265,7 +276,10 @@ class UPM_Profiler:
                 self.gen_perf[key] = self.gen_perf.get(key, 0) + step_perf[key]
 
     def update_inference_energy(self, step_energy):
-        if self.simulator.sum:
+        if self.simulator.visual:
+            for key in step_energy.keys():
+                self.visual_energy[key] = self.visual_energy.get(key, 0) + step_energy[key]
+        elif self.simulator.sum:
             for key in step_energy.keys():
                 self.sum_energy[key] = self.sum_energy.get(key, 0) + step_energy[key]
         else:
@@ -273,7 +287,12 @@ class UPM_Profiler:
                 self.gen_energy[key] = self.gen_energy.get(key, 0) + step_energy[key]
 
     def update_inference_transfer_bytes(self, step_transfer_bytes):
-        if self.simulator.sum:
+        if self.simulator.visual:
+            for key in step_transfer_bytes.keys():
+                self.visual_transfer_bytes[key] = (
+                    self.visual_transfer_bytes.get(key, 0) + step_transfer_bytes[key]
+                )
+        elif self.simulator.sum:
             for key in step_transfer_bytes.keys():
                 self.sum_transfer_bytes[key] = (
                     self.sum_transfer_bytes.get(key, 0) + step_transfer_bytes[key]
@@ -292,20 +311,27 @@ class UPM_Profiler:
         batch_size=1,
         moe_end="",
         experts_per_token=2,
+        visual_end="",  # Add parameter to mark end of visual encoder
     ):
         self.start_inference = time.time_ns()
         self.n_executions = 0
         self.inference_time = 0
+        self.visual_time = 0  # Add visual phase tracking
         self.summarization_time = 0
         self.sum_perf = {}
         self.gen_perf = {}
+        self.visual_perf = {}  # Add visual performance tracking
         self.sum_energy = {}
         self.gen_energy = {}
+        self.visual_energy = {}  # Add visual energy tracking
         self.sum_transfer_bytes = {}
         self.gen_transfer_bytes = {}
+        self.visual_transfer_bytes = {}  # Add visual transfer tracking
 
         self.last_layer = last_layer
+        self.visual_end = visual_end  # Store visual encoder end marker
         self.batch_size = batch_size
+        self.visual_phase_complete = False  # Track if visual phase is done
 
         self.layers_start = {}
         self.layers_end = {}
@@ -319,6 +345,16 @@ class UPM_Profiler:
                 moe_end=moe_end,
                 experts_per_token=experts_per_token,
             )
+            # Add phase tracking to simulator
+            # Only start in visual phase if visual_end is specified
+            if visual_end:
+                self.simulator.visual = True  # Start in visual phase only if VLM
+                self.simulator.sum = False
+            else:
+                self.simulator.visual = False
+                self.simulator.sum = True  # Start in summarization phase for LLM-only
+                self.visual_phase_complete = True  # Mark visual as complete (skipped)
+            self.simulator.gen = False
 
     def end(self):
         if self.simulation:
@@ -335,23 +371,53 @@ class UPM_Profiler:
             self.inference_time = time.time_ns() - self.start_inference
 
         inference_time_sec = self.inference_time / 1e9
+        visual_time_s = self.visual_time / 1e9
         sum_energy_mJ = 0
         gen_energy_mJ = 0
-        sum_time_s = self.summarization_time / 1e9
-        gen_time_s = inference_time_sec - sum_time_s
+        visual_energy_mJ = 0
+        
+        # Adjust time calculations to account for visual phase
+        sum_time_s = (self.summarization_time - self.visual_time) / 1e9
+        gen_time_s = inference_time_sec - sum_time_s - visual_time_s
         gen_n_executions = self.n_executions - 1
+        
+        # TTFT = visual_time + summarization_time
+        ttft_s = visual_time_s + sum_time_s
 
         print("##### UPMEM PROFILER OUTPUT #####")
-        print(
-            "Total time (SUM + GEN):",
-            inference_time_sec,
-            "with weights data type:",
-            self.sim_weights_data_type,
-            "activation data type:",
-            self.sim_activation_data_type,
-            "batch size:",
-            self.batch_size,
-        )
+        
+        # Adjust header based on whether visual phase exists
+        if self.visual_end:
+            print(
+                "Total time (ViT + SUM + GEN):",
+                inference_time_sec,
+                "with weights data type:",
+                self.sim_weights_data_type,
+                "activation data type:",
+                self.sim_activation_data_type,
+                "batch size:",
+                self.batch_size,
+            )
+        else:
+            print(
+                "Total time (SUM + GEN):",
+                inference_time_sec,
+                "with weights data type:",
+                self.sim_weights_data_type,
+                "activation data type:",
+                self.sim_activation_data_type,
+                "batch size:",
+                self.batch_size,
+            )
+        
+        # Print VLM-specific metrics only if visual phase exists
+        if self.visual_end and visual_time_s > 0:
+            print(f"\n=== VLM Metrics ===")
+            print(f"ViT Processing Time: {visual_time_s:.4f}s ({visual_time_s/inference_time_sec*100:.2f}%)")
+            print(f"TTFT (Time To First Token): {ttft_s:.4f}s (ViT + Encoding)")
+            print(f"  - ViT: {visual_time_s:.4f}s")
+            print(f"  - LLM Encoding: {sum_time_s:.4f}s")
+            
         print(
             "Generated tokens: ",
             gen_n_executions * self.batch_size,
@@ -360,18 +426,49 @@ class UPM_Profiler:
             "seconds with tokens/s:",
             (gen_n_executions * self.batch_size) / gen_time_s,
         )
-        print(
-            "Summarization step took:",
-            sum_time_s,
-            "s, weight in the execution: SUM:",
-            sum_time_s / inference_time_sec,
-            "%, GEN:",
-            gen_time_s / inference_time_sec,
-            "%",
-        )
+        
+        # Adjust phase breakdown based on whether visual phase exists
+        if self.visual_end:
+            print(
+                "Phase breakdown - ViT:",
+                visual_time_s / inference_time_sec * 100 if inference_time_sec > 0 else 0,
+                "%, SUM:",
+                sum_time_s / inference_time_sec * 100 if inference_time_sec > 0 else 0,
+                "%, GEN:",
+                gen_time_s / inference_time_sec * 100 if inference_time_sec > 0 else 0,
+                "%",
+            )
+        else:
+            print(
+                "Summarization step took:",
+                sum_time_s,
+                "s, weight in the execution: SUM:",
+                sum_time_s / inference_time_sec if inference_time_sec > 0 else 0,
+                "%, GEN:",
+                gen_time_s / inference_time_sec if inference_time_sec > 0 else 0,
+                "%",
+            )
 
         if self.simulation:
-            print("SUMMARIZATION summary")
+            # Print visual phase statistics only if visual phase exists
+            if self.visual_end and visual_time_s > 0:
+                print("\n=== VISUAL ENCODER (ViT) summary ===")
+                for key in self.visual_transfer_bytes.keys():
+                    print(
+                        "Transferred data in",
+                        key,
+                        self.visual_transfer_bytes[key] / 1e6,
+                        "MB",
+                    )
+                for key in self.visual_energy.keys():
+                    energy_mj = self.visual_energy[key] / 1e9
+                    print("Energy in", key, energy_mj, "mJ")
+                    visual_energy_mJ += energy_mj
+                print("Total ViT Energy:", visual_energy_mJ, "(mJ)")
+                print("ViT Power:", visual_energy_mJ / 1e3 / visual_time_s if visual_time_s > 0 else 0, "W")
+
+            # Print SUMMARIZATION summary
+            print("\n=== SUMMARIZATION summary ===")
             for key in self.sum_transfer_bytes.keys():
                 print(
                     "Transferred data in",
@@ -382,12 +479,13 @@ class UPM_Profiler:
             for key in self.sum_energy.keys():
                 energy_mj = self.sum_energy[key] / 1e9
                 print("Energy in", key, energy_mj, "mJ")
-                sum_energy_mJ += self.sum_energy[key] / 1e9
-            print("Energy:", sum_energy_mJ, "(mJ)")
-            print("Power:", sum_energy_mJ / 1e3 / sum_time_s, "W")
+                sum_energy_mJ += energy_mj
+            print("Total Summarization Energy:", sum_energy_mJ, "(mJ)")
+            print("Summarization Power:", sum_energy_mJ / 1e3 / sum_time_s if sum_time_s > 0 else 0, "W")
 
+            # Print GENERATION summary
             if gen_n_executions > 0:
-                print("GENERATION summary")
+                print("\n=== GENERATION summary ===")
                 for key in self.gen_transfer_bytes.keys():
                     print(
                         "Transferred data in",
@@ -425,7 +523,24 @@ class UPM_Profiler:
                     "W",
                 )
 
-            print("Execution time breakdown (ms / %)")
+            print("\nExecution time breakdown (ms / %)")
+            
+            # Print visual phase breakdown only if it exists
+            if self.visual_end and visual_time_s > 0:
+                print("VISUAL ENCODER (ViT) phase")
+                for perf_key in [
+                    "host_to_device",
+                    "device_to_host",
+                    "compute",
+                    "mem_transfer",
+                    "kv_load",
+                ]:
+                    perf_value = self.visual_perf.get(perf_key, 0)
+                    print(
+                        perf_key, (perf_value / 1e6), "(ms)", 
+                        perf_value / 1e9 / visual_time_s if visual_time_s > 0 else 0
+                    )
+            
             print("SUMMARIZATION phase")
             for perf_key in [
                 "host_to_device",
@@ -436,7 +551,8 @@ class UPM_Profiler:
             ]:
                 perf_value = self.sum_perf.get(perf_key, 0)
                 print(
-                    perf_key, (perf_value / 1e6), "(ms)", perf_value / 1e9 / sum_time_s
+                    perf_key, (perf_value / 1e6), "(ms)", 
+                    perf_value / 1e9 / sum_time_s if sum_time_s > 0 else 0
                 )
 
             if gen_n_executions > 0:
@@ -453,7 +569,7 @@ class UPM_Profiler:
                         perf_key,
                         (perf_value / 1e6),
                         "(ms)",
-                        perf_value / 1e9 / gen_time_s,
+                        perf_value / 1e9 / gen_time_s if gen_time_s > 0 else 0,
                     )
 
         if self.options.report_layers:
@@ -468,6 +584,8 @@ class UPM_Profiler:
         if self.options.print_log_summary:
             self.print_log_summary()
             self.print_log_summary(show_summarization=True)
+            if self.visual_end and visual_time_s > 0:
+                self.print_log_summary(show_visual=True)
             self.print_log_summary(show_all=True)
 
         print("##### END UPMEM PROFILER OUTPUT #####")
@@ -597,17 +715,17 @@ class UPM_Profiler:
 
     def forward_end(self, output_shape, context, layer_obj=None):
         self.forward_time_end = time.time_ns()
-
+    
         weights_shape = torch.Size(
             [self.layers[layer_obj].dim_in, self.layers[layer_obj].dim_out]
         )
-
+    
         cur_exec_time = self.forward_time_end - self.forward_time_start
         performance = {}
         energy = {}
-        transfer_bytes = {}  # Initialize transfer_bytes here
+        transfer_bytes = {}
         relative_start_time = self.forward_time_start - self.start_inference
-
+    
         if self.simulation:
             if self.layers[layer_obj].name == "LlamaRMSNorm":
                 cur_exec_time, performance, energy, transfer_bytes = (
@@ -642,12 +760,41 @@ class UPM_Profiler:
                         weights_shape,
                         output_shape,
                     )
-                )  # or context?
+                )
             self.inference_time += cur_exec_time
             self.update_inference_perf(performance)
             self.update_inference_energy(energy)
             self.update_inference_transfer_bytes(transfer_bytes)
-
+    
+            # Check if we're transitioning from visual to language model
+            # Debug: print current layer info
+            if self.visual_end and not self.visual_phase_complete:
+                print(f"DEBUG: context='{self.layers[layer_obj].context}', looking for='{self.visual_end}'")
+            
+            # Check for visual phase completion
+            # After we see the visual_end marker followed by a language model layer
+            if self.visual_end and not self.visual_phase_complete:
+                # Mark visual complete when we see the first language model layer (after visual_end)
+                # Look for typical language model layers: input_layernorm, q_proj after seeing visual end
+                if hasattr(self, '_seen_visual_end') and self._seen_visual_end:
+                    # We've passed the visual encoder, now in language model
+                    if self.layers[layer_obj].context in ['input_layernorm', 'q_proj', 'rotary_emb']:
+                        self.visual_time = self.inference_time
+                        self.visual_phase_complete = True
+                        self.simulator.visual = False
+                        self.simulator.sum = True
+                        print(f"\n=== Visual encoding complete ===")
+                        print(f"Last visual layer was: {self._last_visual_context}")
+                        print(f"First LLM layer: '{self.layers[layer_obj].context}'")
+                        print(f"Visual time: {self.visual_time / 1e9:.4f}s\n")
+                        delattr(self, '_seen_visual_end')
+                        delattr(self, '_last_visual_context')
+                
+                # Track when we see layers that match visual_end
+                if self.visual_end in self.layers[layer_obj].context or self.layers[layer_obj].context == self.visual_end:
+                    self._seen_visual_end = True
+                    self._last_visual_context = self.layers[layer_obj].context
+    
             self.layers[layer_obj].exec_time += cur_exec_time
             self.layers[layer_obj].energy = add_dictionaries(
                 self.layers[layer_obj].energy, energy
@@ -660,11 +807,11 @@ class UPM_Profiler:
             self.layers[layer_obj].exec_time += cur_exec_time
             self.layers_start[layer_obj] = self.forward_time_start
             self.layers_end[layer_obj] = self.forward_time_end
-
+    
         self.layers[layer_obj].exec_nums += 1
-
+    
         summarization_phase = False if not self.simulation else self.simulator.sum
-
+    
         cur_logging = layer_log(
             self.layers[layer_obj].id,
             self.layers[layer_obj].name,
@@ -679,14 +826,18 @@ class UPM_Profiler:
             energy,
             transfer_bytes,
         )
-
+        # Add visual phase tracking to layer_log
+        cur_logging.visual_phase = 1 if self.simulation and self.simulator.visual else 0
+    
         self.log.append(cur_logging)
+        
         if self.layers[layer_obj].context == self.last_layer:
-            if self.simulation and not self.simulator.sum:
+            if self.simulation and not self.simulator.sum and not self.simulator.visual:
                 self.simulator.sum_size += 1
             if self.n_executions == 0:
                 if self.simulation:
                     self.simulator.start_gen()
+                    self.simulator.gen = True
                     self.simulator.sum_size = (
                         output_shape[-2] if (len(output_shape) > 1) else 1
                     )
