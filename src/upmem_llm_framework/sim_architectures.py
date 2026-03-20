@@ -244,6 +244,26 @@ class Qualcomm_8397(Base_architecture):
             self.tflops = 640
         self.pj_per_tflop = 0.5 * 1e12
 
+class Qualcomm_9075(Base_architecture):
+    def __init__(self, *args, **kwargs):
+        self.name = "Qualcomm_9075_AC"
+        super().__init__(*args, **kwargs)
+        # HOST communication
+        self.host_to_device_bw_GBs = 68
+        self.host_to_device_pj_per_bit = 10
+        self.device_to_host_bw_GBs = 68
+        self.device_to_host_pj_per_bit = 10
+        # Device memory (shared memory like)
+        self.mem_bw_GBs = 68
+        self.mem_pj_per_bit = 10
+        # Compute
+        self.tflops = 25
+        if self.weights_data_type_bytes == 0.5:
+            self.tflops = 100
+        if self.weights_data_type_bytes == 1.0:
+            self.tflops = 50
+        self.pj_per_tflop = 0.5 * 1e12
+
 class DGX100(Base_architecture):
 
     def __init__(self, *args, **kwargs):
